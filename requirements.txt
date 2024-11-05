@@ -1,0 +1,12 @@
+flask
+matplotlib
+flask-cors
+python-dateutil
+tushare
+backtrader
+scikit-learn
+xgboost
+lightgbm
+yfinance
+torch
+transformers
