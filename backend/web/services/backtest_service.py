@@ -6,6 +6,7 @@ from ...strategies.short_term_strategy import ShortTermStrategy
 from ...strategies.medium_term_strategy import MediumTermStrategy
 from ...strategies.long_term_strategy import LongTermStrategy
 from ...data.stock_data import StockData
+from ...data.futures_data import FuturesData
 from ...data.process_data import ProcessData
 
 logger = logging.getLogger(__name__)
@@ -36,16 +37,33 @@ class BacktestService:
             start_date = datetime.strptime(params['startDate'], '%Y-%m-%d')
             end_date = datetime.strptime(params['endDate'], '%Y-%m-%d')
             
-            stock_data = ProcessData.get_stock_data(
-                params['stock'],
-                params['startDate'],
-                params['endDate']
-            )
-            data_feed = StockData(
-                dataname=stock_data,
-                fromdate=start_date,
-                todate=end_date
-            )
+            # 根据symbol_type选择不同的数据源
+            symbol = params.get('symbol', '')
+            symbol_type = params.get('symbol_type', 'stock')
+            
+            if symbol_type == 'futures':
+                data = ProcessData.get_futures_data(
+                    symbol,
+                    params['startDate'],
+                    params['endDate']
+                )
+                data_feed = FuturesData(
+                    dataname=data,
+                    fromdate=start_date,
+                    todate=end_date
+                )
+            else:  # 默认为股票
+                data = ProcessData.get_stock_data(
+                    symbol,
+                    params['startDate'],
+                    params['endDate']
+                )
+                data_feed = StockData(
+                    dataname=data,
+                    fromdate=start_date,
+                    todate=end_date
+                )
+                
             cerebro.adddata(data_feed)
             
             # 添加策略
@@ -74,8 +92,8 @@ class BacktestService:
     @staticmethod
     def _prepare_strategy_params(params):
         """准备策略参数"""
-        return {
-            'code': params['stock'],
+        strategy_params = {
+            'code': params.get('symbol', ''),
             'start_date': datetime.strptime(params['startDate'], '%Y-%m-%d'),
             'end_date': datetime.strptime(params['endDate'], '%Y-%m-%d'),
             'position_size_type': params.get('positionSizeType', 'fixed'),
@@ -84,6 +102,10 @@ class BacktestService:
             'take_profit': float(params.get('takeProfit', 10)) / 100,
             'trailing_stop': float(params.get('trailingStop', 0)) / 100,
         }
+        
+        logger.info(f"Running backtest for {params.get('symbol_type', 'stock')}: {params.get('symbol', '')}")
+        
+        return strategy_params
 
     @staticmethod
     def _process_results(results):

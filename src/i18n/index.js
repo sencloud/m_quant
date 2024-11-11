@@ -427,7 +427,8 @@ const messages = {
           stopLoss: 'Stop Loss (%)',
           takeProfit: 'Take Profit (%)',
           trailingStop: 'Trailing Stop (%)'
-        }
+        },
+        futures: 'Futures'
       },
       strategies: {
         shortTerm: 'Short Term MA Cross',
@@ -444,12 +445,15 @@ const messages = {
         positionSize: 'Please enter position size',
         stopLoss: 'Stop loss must be between 0 and 100',
         takeProfit: 'Take profit must be between 0 and 100',
-        trailingStop: 'Trailing stop must be between 0 and 100'
+        trailingStop: 'Trailing stop must be between 0 and 100',
+        selectFutures: 'Please select a futures contract',
+        selectSymbol: 'Please select either a stock or futures contract'
       },
       error: {
         failed: 'Failed to run backtest',
         validation: 'Please fill in all required fields',
-        loadStocks: 'Failed to load stocks'
+        loadStocks: 'Failed to load stocks',
+        loadFutures: 'Failed to load futures contracts'
       },
       results: {
         performance: 'Performance Summary',
@@ -1080,7 +1084,8 @@ const messages = {
           stopLoss: '止损比例 (%)',
           takeProfit: '止盈比例 (%)',
           trailingStop: '追踪止损 (%)'
-        }
+        },
+        futures: '期货'
       },
       strategies: {
         shortTerm: '短期均线交叉',
@@ -1097,12 +1102,15 @@ const messages = {
         positionSize: '请输入仓位大小',
         stopLoss: '止损比例必须在0到100之间',
         takeProfit: '止盈比例必须在0到100之间',
-        trailingStop: '追踪止损必须在0到100之间'
+        trailingStop: '追踪止损必须在0到100之间',
+        selectFutures: '请选择期货合约',
+        selectSymbol: '请选择股票或期货合约'
       },
       error: {
         failed: '回测运行失败',
         validation: '请填写所有必填字段',
-        loadStocks: '加载股票列表失败'
+        loadStocks: '加载股票列表失败',
+        loadFutures: '加载期货合约失败'
       },
       results: {
         performance: '绩效总结',

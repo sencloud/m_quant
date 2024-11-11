@@ -25,7 +25,7 @@
           <el-form-item 
             :label="$t('backtest.form.stock')" 
             prop="stock"
-            :rules="[{ required: true, message: $t('backtest.validation.selectStock') }]"
+            :rules="[{ required: false, message: $t('backtest.validation.selectStock') }]"
           >
             <el-cascader
               v-model="form.stock"
@@ -37,6 +37,25 @@
               :loading="loadingStocks"
               filterable
               :filter-method="filterStocks"
+            />
+          </el-form-item>
+
+          <!-- 新增期货选择 -->
+          <el-form-item 
+            :label="$t('backtest.form.futures')" 
+            prop="futures"
+            :rules="[{ required: false, message: $t('backtest.validation.selectFutures') }]"
+          >
+            <el-cascader
+              v-model="form.futures"
+              :options="futuresOptions"
+              :props="cascaderProps"
+              :placeholder="$t('backtest.form.futures')"
+              class="w-full"
+              @change="handleFuturesChange"
+              :loading="loadingFutures"
+              filterable
+              :filter-method="filterFutures"
             />
           </el-form-item>
 
@@ -255,6 +274,7 @@ import axios from 'axios'
 import PriceChart from '../components/PriceChart.vue'
 import MetricCard from '../components/MetricCard.vue'
 import TradeList from '../components/TradeList.vue'
+import { getFuturesCategories } from '@/api/futures'
 
 const { t } = useI18n()
 const route = useRoute()
@@ -263,6 +283,7 @@ const formRef = ref(null)
 const form = ref({
   strategy: route.query.strategy || '',
   stock: '',
+  futures: '',
   dateRange: [],
   // Capital and Fees
   initialCapital: 100000,
@@ -279,10 +300,13 @@ const form = ref({
 
 const loading = ref(false)
 const loadingStocks = ref(false)
+const loadingFutures = ref(false)
 const error = ref(null)
 const results = ref(null)
 const stocks = ref({})
 const stockOptions = ref([])
+const futures = ref({})
+const futuresOptions = ref([])
 
 const strategies = [
   { label: 'home.strategies.shortTerm.name', value: 'short_term' },
@@ -310,9 +334,9 @@ const handleBacktest = async () => {
     
     const [startDate, endDate] = form.value.dateRange
     
-    const response = await axios.post('/api/backtest', {
+    // 构建请求参数
+    const requestData = {
       strategy: form.value.strategy,
-      stock: form.value.stock,
       startDate,
       endDate,
       initialCapital: form.value.initialCapital,
@@ -323,7 +347,23 @@ const handleBacktest = async () => {
       stopLoss: form.value.stopLoss,
       takeProfit: form.value.takeProfit,
       trailingStop: form.value.trailingStop
-    })
+    }
+
+    // 根据选择添加交易品种
+    if (form.value.stock) {
+      requestData.stock = form.value.stock
+    }
+    if (form.value.futures) {
+      requestData.futures = form.value.futures
+    }
+
+    // 检查是否选择了交易品种
+    if (!form.value.stock && !form.value.futures) {
+      error.value = t('backtest.validation.selectSymbol')
+      return
+    }
+    
+    const response = await axios.post('/api/backtest', requestData)
     
     // Parse response data if it's a string and handle NaN values
     if (typeof response.data === 'string') {
@@ -434,8 +474,105 @@ const filterStocks = (node, keyword) => {
   )
 }
 
+const loadFutures = async () => {
+  loadingFutures.value = true
+  error.value = null
+  try {
+    const response = await getFuturesCategories()
+    console.log('Raw API response:', response)
+    
+    // 检查响应结构
+    if (!response || !response.data) {
+      console.error('Invalid response structure:', response)
+      throw new Error('Invalid API response')
+    }
+    
+    // 直接使用返回的数据，因为它已经是我们需要的格式
+    futures.value = response.data
+    console.log('Futures data:', futures.value)
+    
+    // 检查数据是否为空
+    if (Object.keys(futures.value).length === 0) {
+      console.warn('No futures data available')
+      futuresOptions.value = []
+      return
+    }
+    
+    updateFuturesOptions()
+  } catch (err) {
+    console.error('Failed to load futures:', err)
+    error.value = t('backtest.error.loadFutures')
+  } finally {
+    loadingFutures.value = false
+  }
+}
+
+const updateFuturesOptions = () => {
+  try {
+    console.log('Starting to update futures options with data:', futures.value)
+    
+    futuresOptions.value = Object.entries(futures.value).map(([exchange, categories]) => {
+      return {
+        value: exchange,
+        label: t(`stocks.futures.exchanges.${exchange}`),
+        children: Object.entries(categories).map(([category, futuresList]) => {
+          return {
+            value: category,
+            label: t(`futures.categories.${category}`, category),
+            children: Array.isArray(futuresList) ? futuresList.map(futures => ({
+              value: futures.code,
+              label: `${futures.name} (${futures.code})`,
+              code: futures.code,
+              name: futures.name
+            })) : []
+          }
+        })
+      }
+    })
+    
+    console.log('Successfully updated futures options:', futuresOptions.value)
+  } catch (err) {
+    console.error('Error in updateFuturesOptions:', err)
+    futuresOptions.value = []
+  }
+}
+
+const handleFuturesChange = (value) => {
+  form.value.futures = value
+}
+
+const filterFutures = (node, keyword) => {
+  const { value, label, children } = node
+  return (
+    value.toLowerCase().indexOf(keyword.toLowerCase()) !== -1 ||
+    label.toLowerCase().indexOf(keyword.toLowerCase()) !== -1 ||
+    (children && children.some(child => filterFutures(child, keyword)))
+  )
+}
+
+// 添加一个辅助函数来检查和打印数据结构
+const logDataStructure = (data, level = 0) => {
+  const indent = '  '.repeat(level)
+  if (Array.isArray(data)) {
+    console.log(indent + 'Array:', data.length, 'items')
+    data.forEach((item, index) => {
+      console.log(indent + `[${index}]:`)
+      logDataStructure(item, level + 1)
+    })
+  } else if (typeof data === 'object' && data !== null) {
+    console.log(indent + 'Object:')
+    Object.entries(data).forEach(([key, value]) => {
+      console.log(indent + key + ':')
+      logDataStructure(value, level + 1)
+    })
+  } else {
+    console.log(indent + String(data))
+  }
+}
+
 onMounted(() => {
   loadStocks()
+  loadFutures()
 })
 </script>
 

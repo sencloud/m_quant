@@ -1,5 +1,6 @@
 from flask import request, jsonify
 from datetime import datetime
+import logging
 from ...database.connection import execute_query
 from . import bp
 
@@ -192,6 +193,63 @@ def get_futures_mapping():
         })
         
     except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@bp.route('/futures/categories', methods=['GET'])
+def get_futures_categories():
+    """
+    获取按交易所和品种分类的期货合约列表，只返回在fut_daily表中有交易数据的合约
+    """
+    logger = logging.getLogger(__name__)
+    logger.info("Fetching futures categories")
+    
+    try:
+        query = '''
+            SELECT DISTINCT b.ts_code, b.name, b.exchange, b.fut_code
+            FROM fut_basic b
+            INNER JOIN fut_daily d ON b.ts_code = d.ts_code
+            WHERE (b.delist_date IS NULL OR b.delist_date > 20240101)
+            ORDER BY b.ts_code
+        '''
+        
+        today = datetime.now().strftime('%Y%m%d')
+        logger.info(f"Executing query with today's date: {today}")
+        
+        # 在一次调用中获取所有数据
+        results = execute_query(query)
+        logger.info(f"Query returned {len(results)} results")
+        
+        # 按交易所和品种分类
+        categorized = {}
+        for row in results:
+            # 假设列的顺序是: ts_code, name, exchange, fut_code
+            ts_code, name, exchange, fut_code = row
+            
+            if exchange not in categorized:
+                categorized[exchange] = {}
+                logger.info(f"Created new exchange category: {exchange}")
+                
+            if fut_code not in categorized[exchange]:
+                categorized[exchange][fut_code] = []
+                logger.info(f"Created new futures code category: {fut_code} under {exchange}")
+                
+            categorized[exchange][fut_code].append({
+                'code': ts_code,
+                'name': name,
+                'fut_code': fut_code
+            })
+            
+        logger.info(f"Successfully categorized {len(results)} futures contracts")
+        return jsonify({
+            'success': True,
+            'data': categorized
+        })
+        
+    except Exception as e:
+        logger.error(f"Error fetching futures categories: {str(e)}", exc_info=True)
         return jsonify({
             'success': False,
             'error': str(e)

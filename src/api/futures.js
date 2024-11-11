@@ -67,4 +67,8 @@ export const fetchFuturesMapping = (params) => {
       tradeDate: params.tradeDate
     }
   })
+}
+
+export const getFuturesCategories = () => {
+  return http.get('/api/futures/categories')
 } 

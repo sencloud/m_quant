@@ -154,3 +154,34 @@ class ProcessData:
             logger.error(f"Error saving stock data: {str(e)}")
             logger.error(f"First few rows of input data:\n{data.head()}")
             raise
+
+    @staticmethod
+    def get_futures_data(symbol, start_date, end_date):
+        """获取期货数据"""
+        try:
+            query = '''
+                SELECT trade_date as date, open, high, low, close, vol, oi
+                FROM fut_daily
+                WHERE ts_code = ? AND trade_date BETWEEN ? AND ?
+                ORDER BY trade_date
+            '''
+            
+            # 转换日期格式
+            start_date = start_date.replace('-', '')
+            end_date = end_date.replace('-', '')
+            
+            # 执行查询
+            data = execute_query(query, [symbol, start_date, end_date])
+            
+            # 转换为DataFrame
+            df = pd.DataFrame(data, columns=['date', 'open', 'high', 'low', 'close', 'vol', 'oi'])
+            
+            # 处理日期列
+            df['date'] = pd.to_datetime(df['date'], format='%Y%m%d')
+            df.set_index('date', inplace=True)
+            
+            return df
+            
+        except Exception as e:
+            logger.error(f"Error getting futures data: {str(e)}", exc_info=True)
+            raise
