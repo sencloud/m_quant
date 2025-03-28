@@ -1,6 +1,7 @@
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Request, Depends
 from typing import List
-from models.trading import OptionsStrategy
+from models.trading import OptionsStrategy, DailyStrategyAnalysis
+from services.trading import TradingService
 from utils.logger import logger
 import httpx
 from config import settings
@@ -9,6 +10,7 @@ from openai import OpenAI
 from fastapi.responses import StreamingResponse
 import asyncio
 from starlette.background import BackgroundTask
+from datetime import datetime
 
 router = APIRouter()
 
@@ -17,6 +19,9 @@ client = OpenAI(
     api_key=settings.DEEPSEEK_API_KEY,
     base_url="https://api.deepseek.com"
 )
+
+def get_trading_service() -> TradingService:
+    return TradingService()
 
 async def stream_response(response, request: Request):
     reasoning_content = ""
@@ -49,15 +54,29 @@ async def stream_response(response, request: Request):
         logger.info("流式响应结束")
 
 @router.get("/options")
-async def get_options_strategies(request: Request):
+async def get_options_strategies(
+    date: str,
+    request: Request,
+    trading_service: TradingService = Depends(get_trading_service)
+):
     """获取期权策略分析"""
     try:
+        # 首先尝试从数据库获取
+        analysis = trading_service.get_strategy_analysis(date)
+        if analysis:
+            logger.info(f"从数据库获取到策略分析 - 日期: {date}")
+            return {
+                "content": analysis.content,
+                "reasoning_content": analysis.reasoning_content
+            }
+
+        # 如果数据库中没有，则调用Deepseek API
+        logger.info(f"数据库中没有找到策略分析，开始调用Deepseek API - 日期: {date}")
+        
         prompt = """基于今天的豆粕市场环境，我做出如下交易选择，你评估下是否合适
 开空：豆粕2509合约期货
 买多2509 3200的期权
 买跌2505 2750的期权"""
-        
-        logger.info(f"开始调用Deepseek API，prompt: {prompt}")
         
         try:
             response = client.chat.completions.create(

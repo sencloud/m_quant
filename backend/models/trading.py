@@ -1,5 +1,6 @@
 from pydantic import BaseModel
-from typing import List, Dict
+from typing import List, Dict, Optional
+from datetime import date
 
 class StrategyDetails(BaseModel):
     entry_points: List[str]
@@ -13,4 +14,11 @@ class OptionsStrategy(BaseModel):
     risk_level: str
     expected_return: str
     time_horizon: str
-    strategy_details: StrategyDetails 
+    strategy_details: StrategyDetails
+
+class DailyStrategyAnalysis(BaseModel):
+    date: date
+    reasoning_content: str
+    content: str
+    created_at: Optional[date] = None
+    updated_at: Optional[date] = None 

@@ -328,7 +328,7 @@ class MarketDataService:
         try:
             logger.info("开始获取豆粕库存数据")
             # 使用akshare获取豆粕库存数据
-            df = ak.futures_inventory_99(symbol='豆粕')
+            df = ak.futures_inventory_em(symbol='豆粕')
             
             if df is None or df.empty:
                 logger.warning("未获取到豆粕库存数据")
