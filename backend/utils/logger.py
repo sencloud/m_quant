@@ -1,30 +1,27 @@
-import logging
 import sys
+from loguru import logger
 from pathlib import Path
-from datetime import datetime
 
-def setup_logging(log_dir='logs'):
-    """Setup logging configuration"""
-    log_dir = Path(log_dir)
-    log_dir.mkdir(exist_ok=True)
-    
-    # Create log filename with timestamp
-    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-    log_file = log_dir / f'backtesting_{timestamp}.log'
-    
-    # Configure logging
-    logging.basicConfig(
-        level=logging.INFO,
-        format='%(asctime)s [%(levelname)s] %(name)s: %(message)s',
-        handlers=[
-            logging.FileHandler(log_file),
-            logging.StreamHandler(sys.stdout)
-        ]
-    )
-    
-    # Add custom logging levels for strategy events
-    logging.addLevelName(25, 'STRATEGY')
-    logging.Logger.strategy = lambda self, message, *args, **kwargs: \
-        self.log(25, message, *args, **kwargs)
-    
-    return logging.getLogger(__name__)
+# 创建日志目录
+log_path = Path("logs")
+log_path.mkdir(exist_ok=True)
+
+# 配置日志
+logger.remove()  # 移除默认的处理器
+
+# 添加控制台处理器
+logger.add(
+    sys.stderr,
+    format="<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - <level>{message}</level>",
+    level="INFO"
+)
+
+# 添加文件处理器
+logger.add(
+    "logs/app_{time}.log",
+    rotation="500 MB",
+    retention="10 days",
+    format="{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | {name}:{function}:{line} - {message}",
+    level="DEBUG",
+    encoding="utf-8"
+) 
