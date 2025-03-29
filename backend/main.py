@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from routers import market_data, trading
+from routers import market_data, trading, fundamental
 from config import settings
 from utils.logger import logger
 
@@ -33,6 +33,13 @@ app.include_router(
     tags=["trading"]
 )
 logger.info("交易策略路由注册完成")
+
+app.include_router(
+    fundamental.router,
+    prefix=f"{settings.API_V1_STR}/fundamental",
+    tags=["fundamental"]
+)
+logger.info("基本面分析路由注册完成")
 
 @app.on_event("startup")
 async def startup_event():

@@ -16,7 +16,7 @@ class MarketDataService:
         self.logger = logger
         logger.debug("Tushare API初始化完成")
 
-    def _get_futures_data(self, start_date: Optional[str] = None, end_date: Optional[str] = None, symbol: str = "M") -> Optional[pd.DataFrame]:
+    def _get_futures_data(self, start_date: Optional[str] = None, end_date: Optional[str] = None, symbol: str = "M") -> List[FuturesData]:
         """获取期货数据"""
         try:
             # 如果是品种代码，先获取主力合约
@@ -31,13 +31,13 @@ class MarketDataService:
                 )
                 if trade_cal is None or trade_cal.empty:
                     logger.warning(f"未找到最近的交易日")
-                    return None
+                    return []
                 
                 # 获取小于等于请求结束日期的最后一个交易日
                 trade_cal = trade_cal[trade_cal['cal_date'] <= (end_date if end_date else datetime.now().strftime('%Y%m%d'))]
                 if trade_cal.empty:
                     logger.warning(f"未找到小于等于{end_date}的交易日")
-                    return None
+                    return []
                     
                 latest_trade_date = trade_cal.iloc[0]['cal_date']
                 logger.info(f"最近的交易日: {latest_trade_date}")
@@ -51,7 +51,7 @@ class MarketDataService:
                 
                 if main_contract is None or main_contract.empty:
                     logger.warning(f"未找到主力合约 - 品种: {symbol}, 日期: {latest_trade_date}")
-                    return None
+                    return []
                 symbol = main_contract.iloc[0]['mapping_ts_code']
                 logger.info(f"获取到主力合约: {symbol}")
             
@@ -62,8 +62,8 @@ class MarketDataService:
             )
             if contract_info is None or contract_info.empty:
                 logger.warning(f"未找到合约信息: {symbol}")
-                return None
-                
+                return []
+            
             # 获取合约的实际交易日期范围
             contract_start_date = contract_info.iloc[0]['list_date']
             contract_end_date = contract_info.iloc[0]['delist_date']
@@ -94,33 +94,52 @@ class MarketDataService:
             
             if df is None or df.empty:
                 logger.warning(f"未找到期货数据 - 合约: {symbol}, 开始日期: {start_date}, 结束日期: {end_date}")
-                return None
+                return []
             
             logger.info(f"成功获取期货数据，共{len(df)}条记录")
             logger.info(f"数据示例: \n{df.head()}")
             
-            # 重命名列以匹配我们的模型
-            df = df.rename(columns={
-                'trade_date': 'trade_date',
-                'open': 'open',
-                'high': 'high',
-                'low': 'low',
-                'close': 'close',
-                'vol': 'vol',
-                'amount': 'amount'
-            })
+            # 处理数据
+            futures_data = []
+            for _, row in df.iterrows():
+                # 从ts_code中提取合约代码
+                contract = row['ts_code'].split('.')[0]
+                
+                # 处理可能的无穷大或NaN值
+                def safe_float(value):
+                    try:
+                        if pd.isna(value) or np.isinf(value):
+                            return 0.0
+                        return float(value)
+                    except (ValueError, TypeError):
+                        return 0.0
+                
+                data = {
+                    'ts_code': row['ts_code'],
+                    'trade_date': row['trade_date'],
+                    'pre_close': safe_float(row['pre_close']),
+                    'pre_settle': safe_float(row['pre_settle']),
+                    'open': safe_float(row['open']),
+                    'high': safe_float(row['high']),
+                    'low': safe_float(row['low']),
+                    'close': safe_float(row['close']),
+                    'settle': safe_float(row['settle']),
+                    'change1': safe_float(row['change1']),
+                    'change2': safe_float(row['change2']),
+                    'vol': safe_float(row['vol']),
+                    'amount': safe_float(row['amount']),
+                    'oi': safe_float(row['oi']),
+                    'oi_chg': safe_float(row['oi_chg']),
+                    'contract': contract,
+                    'price': safe_float(row['close']),  # 使用收盘价作为当前价格
+                    'historicalPrices': []  # 这个字段会在API层面处理
+                }
+                futures_data.append(FuturesData(**data))
             
-            # 处理缺失值和异常值
-            df = df.fillna(method='ffill').fillna(method='bfill')
-            df = df.replace([np.inf, -np.inf], np.nan)
-            df = df.fillna(method='ffill').fillna(method='bfill')
-            
-            logger.info(f"数据处理完成，最终数据示例: \n{df.head()}")
-            return df
-            
+            return futures_data
         except Exception as e:
-            logger.error(f"获取期货数据失败: {str(e)}", exc_info=True)
-            return None
+            logger.error(f"获取期货数据失败: {str(e)}")
+            raise
 
     def calculate_ma(self, data: pd.DataFrame, window: int) -> pd.Series:
         """计算移动平均线"""
@@ -201,29 +220,53 @@ class MarketDataService:
     def get_futures_data(self, start_date: Optional[str] = None, end_date: Optional[str] = None, symbol: str = "M") -> List[FuturesData]:
         """获取豆粕期货数据"""
         try:
-            # 获取主力合约数据
-            df = self._get_futures_data(start_date, end_date, symbol)
-            if df is None or df.empty:
+            # 获取数据
+            futures_data = self._get_futures_data(start_date, end_date, symbol)
+            if not futures_data:
                 return []
             
-            # 按时间排序
-            df = df.sort_values('trade_date')
+            # 按合约分组
+            contract_groups = {}
+            for data in futures_data:
+                if data.contract not in contract_groups:
+                    contract_groups[data.contract] = {
+                        'ts_code': data.ts_code,
+                        'trade_date': data.trade_date,
+                        'pre_close': data.pre_close,
+                        'pre_settle': data.pre_settle,
+                        'open': data.open,
+                        'high': data.high,
+                        'low': data.low,
+                        'close': data.close,
+                        'settle': data.settle,
+                        'change1': data.change1,
+                        'change2': data.change2,
+                        'vol': data.vol,
+                        'amount': data.amount,
+                        'oi': data.oi,
+                        'oi_chg': data.oi_chg,
+                        'contract': data.contract,
+                        'price': data.price,
+                        'historicalPrices': []
+                    }
+                contract_groups[data.contract]['historicalPrices'].append({
+                    'date': data.trade_date,
+                    'open': data.open,
+                    'high': data.high,
+                    'low': data.low,
+                    'close': data.close,
+                    'volume': data.vol,
+                    'contract': data.contract
+                })
             
-            # 转换为模型格式
-            return [
-                FuturesData(
-                    ts_code=symbol,
-                    trade_date=row['trade_date'],
-                    open=float(row['open']),
-                    high=float(row['high']),
-                    low=float(row['low']),
-                    close=float(row['close']),
-                    vol=float(row['vol']),
-                    change1=float(row['change1']),
-                    amount=float(row['amount'])
-                )
-                for _, row in df.iterrows()
-            ]
+            # 转换为FuturesData列表
+            result = []
+            for contract_data in contract_groups.values():
+                # 按日期排序
+                contract_data['historicalPrices'].sort(key=lambda x: x['date'])
+                result.append(FuturesData(**contract_data))
+            
+            return result
         except Exception as e:
             logger.error(f"获取期货数据失败: {str(e)}")
             return []
@@ -349,15 +392,24 @@ class MarketDataService:
             # 转换为模型格式
             return [
                 FuturesData(
-                    ts_code=row['contract'],
+                    ts_code=row['ts_code'],
                     trade_date=row['trade_date'],
-                    open=float(row['open']),
-                    high=float(row['high']),
-                    low=float(row['low']),
-                    close=float(row['close']),
-                    vol=float(row['vol']),
-                    change1=float(row['change1']),
-                    amount=float(row['amount'])
+                    pre_close=row['pre_close'],
+                    pre_settle=row['pre_settle'],
+                    open=row['open'],
+                    high=row['high'],
+                    low=row['low'],
+                    close=row['close'],
+                    settle=row['settle'],
+                    change1=row['change1'],
+                    change2=row['change2'],
+                    vol=row['vol'],
+                    amount=row['amount'],
+                    oi=row['oi'],
+                    oi_chg=row['oi_chg'],
+                    contract=row['contract'],
+                    price=row['price'],
+                    historicalPrices=row['historicalPrices']
                 )
                 for _, row in combined_df.iterrows()
             ]
@@ -402,4 +454,150 @@ class MarketDataService:
             logger.error(f"获取库存数据失败: {str(e)}")
             import traceback
             traceback.print_exc()
+            return {}
+
+    def calculate_technical_indicators(self, df: pd.DataFrame) -> Dict:
+        """计算技术分析指标"""
+        try:
+            # 处理可能的无穷大或NaN值
+            def safe_float(value):
+                try:
+                    if pd.isna(value) or np.isinf(value):
+                        return 0.0
+                    return float(value)
+                except (ValueError, TypeError):
+                    return 0.0
+            
+            # 计算EMA
+            ema12 = df['close'].ewm(span=12, adjust=False).mean()
+            ema26 = df['close'].ewm(span=26, adjust=False).mean()
+            
+            # 计算MACD
+            dif = ema12 - ema26
+            dea = dif.ewm(span=9, adjust=False).mean()
+            bar = 2 * (dif - dea)
+            
+            # 计算RSI
+            delta = df['close'].diff()
+            gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
+            loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
+            rs = gain / loss
+            rsi = 100 - (100 / (1 + rs))
+            
+            # 计算KDJ
+            low_9 = df['low'].rolling(window=9).min()
+            high_9 = df['high'].rolling(window=9).max()
+            rsv = (df['close'] - low_9) / (high_9 - low_9) * 100
+            k = rsv.rolling(window=3).mean()
+            d = k.rolling(window=3).mean()
+            j = 3 * k - 2 * d
+            
+            # 计算布林带
+            ma20 = df['close'].rolling(window=20).mean()
+            std20 = df['close'].rolling(window=20).std()
+            upper = ma20 + 2 * std20
+            lower = ma20 - 2 * std20
+            
+            # 获取最新值
+            latest_price = df['close'].iloc[-1]
+            latest_volume = df['vol'].iloc[-1]
+            volume_change = (df['vol'].iloc[-1] - df['vol'].iloc[-2]) / df['vol'].iloc[-2] * 100
+            
+            # 确定趋势
+            def get_trend(current, previous):
+                if current > previous:
+                    return "up"
+                elif current < previous:
+                    return "down"
+                else:
+                    return "neutral"
+            
+            return {
+                "contract": df['ts_code'].iloc[-1],
+                "last_updated": df['trade_date'].iloc[-1],
+                "current_price": safe_float(latest_price),
+                "price_targets": {
+                    "support_levels": {
+                        "s1": safe_float(latest_price * 0.98),
+                        "s2": safe_float(latest_price * 0.95)
+                    },
+                    "resistance_levels": {
+                        "r1": safe_float(latest_price * 1.02),
+                        "r2": safe_float(latest_price * 1.05)
+                    },
+                    "trend": get_trend(latest_price, df['close'].iloc[-2])
+                },
+                "ema": {
+                    "ema12": safe_float(ema12.iloc[-1]),
+                    "ema26": safe_float(ema26.iloc[-1]),
+                    "trend": get_trend(ema12.iloc[-1], ema26.iloc[-1])
+                },
+                "macd": {
+                    "diff": safe_float(dif.iloc[-1]),
+                    "dea": safe_float(dea.iloc[-1]),
+                    "bar": safe_float(bar.iloc[-1]),
+                    "trend": get_trend(dif.iloc[-1], dea.iloc[-1])
+                },
+                "rsi": {
+                    "value": safe_float(rsi.iloc[-1]),
+                    "trend": get_trend(rsi.iloc[-1], rsi.iloc[-2])
+                },
+                "kdj": {
+                    "k": safe_float(k.iloc[-1]),
+                    "d": safe_float(d.iloc[-1]),
+                    "j": safe_float(j.iloc[-1]),
+                    "trend": get_trend(k.iloc[-1], d.iloc[-1])
+                },
+                "bollinger_bands": {
+                    "upper": safe_float(upper.iloc[-1]),
+                    "middle": safe_float(ma20.iloc[-1]),
+                    "lower": safe_float(lower.iloc[-1]),
+                    "trend": get_trend(latest_price, ma20.iloc[-1])
+                },
+                "volume": {
+                    "current": safe_float(latest_volume),
+                    "change_percent": safe_float(volume_change),
+                    "trend": get_trend(latest_volume, df['vol'].iloc[-2])
+                }
+            }
+        except Exception as e:
+            logger.error(f"计算技术指标失败: {str(e)}")
+            return {}
+
+    def get_technical_indicators(self, symbol: str = "M") -> Dict:
+        """获取技术分析指标"""
+        try:
+            logger.info(f"开始获取技术分析指标 - 品种: {symbol}")
+            # 获取最近30天的数据用于计算技术指标
+            futures_data = self._get_futures_data(
+                start_date=(datetime.now() - timedelta(days=30)).strftime('%Y%m%d'),
+                end_date=datetime.now().strftime('%Y%m%d'),
+                symbol=symbol
+            )
+            
+            if not futures_data:
+                logger.warning("未获取到期货数据")
+                return {}
+            
+            # 将列表转换为DataFrame
+            df = pd.DataFrame([{
+                'ts_code': item.ts_code,
+                'trade_date': item.trade_date,
+                'open': item.open,
+                'high': item.high,
+                'low': item.low,
+                'close': item.close,
+                'vol': item.vol
+            } for item in futures_data])
+            
+            # 按日期排序
+            df = df.sort_values('trade_date')
+            
+            # 计算技术指标
+            indicators = self.calculate_technical_indicators(df)
+            logger.info(f"成功计算技术分析指标: {indicators}")
+            return indicators
+            
+        except Exception as e:
+            logger.error(f"获取技术分析指标失败: {str(e)}")
             return {} 

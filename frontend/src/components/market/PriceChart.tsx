@@ -1,122 +1,147 @@
-import React from 'react';
-import { useQuery } from '@tanstack/react-query';
-import axios from 'axios';
-import ReactECharts from 'echarts-for-react';
-import { API_ENDPOINTS } from '../../config/api';
+import React, { useEffect, useRef } from 'react';
+import * as echarts from 'echarts';
+import { ContractPrice } from '../../types/market';
 
-interface MarketData {
-  trade_date: string;
-  close: number;
-  open: number;
-  high: number;
-  low: number;
+interface PriceChartProps {
+  contract: ContractPrice;
 }
 
-const PriceChart: React.FC = () => {
-  const { data: marketData } = useQuery<MarketData[]>({
-    queryKey: ['marketData'],
-    queryFn: async () => {
-      // 获取最近一年的数据
-      const end = new Date();
-      const start = new Date();
-      start.setFullYear(start.getFullYear() - 1);
-      
-      const response = await axios.get(API_ENDPOINTS.market.futures, {
-        params: { 
-          symbol: 'M',
-          start_date: start.toISOString().split('T')[0].replace(/-/g, ''),
-          end_date: end.toISOString().split('T')[0].replace(/-/g, '')
-        }
-      });
-      return response.data;
-    }
-  });
-
-  const getChartOption = () => {
-    if (!marketData) return {};
-
-    const klineData = marketData.map(item => [
-      item.trade_date,
-      item.open,
-      item.close,
-      item.low,
-      item.high
-    ]);
-
-    return {
+const PriceChart: React.FC<PriceChartProps> = ({ contract }) => {
+  const chartRef = useRef<HTMLDivElement>(null);
+  
+  useEffect(() => {
+    if (!chartRef.current) return;
+    
+    // 获取历史数据
+    const historicalData = contract.historicalPrices
+      .filter(item => item.contract === contract.contract)
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    
+    if (historicalData.length === 0) return;
+    
+    // 提取日期和价格数据
+    const dates = historicalData.map(item => item.date);
+    const prices = historicalData.map(item => item.close);
+    
+    // 创建ECharts实例
+    const chartInstance = echarts.init(chartRef.current);
+    
+    // 图表配置项
+    const option = {
       tooltip: {
         trigger: 'axis',
-        axisPointer: {
-          type: 'cross'
+        formatter: function(params: any) {
+          const historicalPoint = params[0];
+          const currentPoint = params[1];
+          return `
+            <div>
+              <p>${historicalPoint.axisValue}</p>
+              <p style="margin: 0">
+                <span style="display:inline-block;margin-right:4px;border-radius:10px;width:10px;height:10px;background-color:#1890ff;"></span>
+                历史当日均价: ${historicalPoint.value.toFixed(2)}元/吨
+              </p>
+              <p style="margin: 0">
+                <span style="display:inline-block;margin-right:4px;border-radius:10px;width:10px;height:10px;border: 2px dashed #FF4D4F;"></span>
+                当前价格: ${contract.price.toFixed(2)}元/吨
+              </p>
+            </div>
+          `;
         }
       },
       legend: {
-        data: ['K线']
+        data: ['历史当日均价', '当前价格'],
+        top: 0
       },
       grid: {
-        left: '10%',
-        right: '10%',
-        bottom: '15%'
+        left: '3%',
+        right: '4%',
+        bottom: '3%',
+        containLabel: true
       },
       xAxis: {
         type: 'category',
-        data: marketData.map(item => item.trade_date),
-        scale: true,
         boundaryGap: false,
-        axisLine: { onZero: false },
-        splitLine: { show: false },
-        splitNumber: 20
+        data: dates,
+        name: '日期',
+        nameLocation: 'middle',
+        nameGap: 30
       },
       yAxis: {
-        scale: true,
-        splitArea: {
-          show: true
-        }
-      },
-      dataZoom: [
-        {
-          type: 'inside',
-          start: 50,
-          end: 100
+        type: 'value',
+        name: '价格 (元/吨)',
+        nameLocation: 'middle',
+        nameGap: 50,
+        axisLabel: {
+          formatter: '{value}.00'
         },
-        {
-          show: true,
-          type: 'slider',
-          bottom: '5%',
-          start: 50,
-          end: 100
-        }
-      ],
+        min: function(value: any) {
+          // 设置最小值为最低价格的95%
+          return Math.floor(value.min * 0.95);
+        },
+        max: function(value: any) {
+          // 设置最大值为最高价格的105%
+          return Math.ceil(value.max * 1.05);
+        },
+        splitNumber: 5,  // 设置分割段数
+        scale: true,  // 启用自动缩放
+        boundaryGap: [0.1, 0.1]  // 设置边界留白比例
+      },
       series: [
         {
-          name: 'K线',
-          type: 'candlestick',
-          data: klineData,
-          itemStyle: {
-            color: '#ef5350',
-            color0: '#26a69a',
-            borderColor: '#ef5350',
-            borderColor0: '#26a69a'
+          name: '历史当日均价',
+          type: 'line',
+          data: prices,
+          smooth: true,
+          symbol: 'none',
+          lineStyle: {
+            width: 2,
+            color: '#1890ff'
           },
-          encode: {
-            x: 0,
-            y: [1, 2, 3, 4]
+          itemStyle: {
+            color: '#1890ff'
+          },
+          connectNulls: true,
+          emphasis: {
+            focus: 'series'
+          }
+        },
+        {
+          name: '当前价格',
+          type: 'line',
+          symbol: 'none',
+          smooth: true,
+          data: Array(dates.length).fill(parseFloat(contract.price.toString())),
+          lineStyle: {
+            width: 3,
+            color: '#FF4D4F',
+            type: 'dashed'
+          },
+          connectNulls: true,
+          emphasis: {
+            focus: 'series'
           }
         }
       ]
     };
-  };
+    
+    // 渲染图表
+    chartInstance.setOption(option);
+    
+    // 窗口大小变化时重绘图表
+    const handleResize = () => {
+      chartInstance.resize();
+    };
+    window.addEventListener('resize', handleResize);
+    
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      chartInstance.dispose();
+    };
+  }, [contract]);
 
   return (
-    <div className="bg-white rounded-lg p-6">
-      <h3 className="text-lg font-medium text-gray-900 mb-4">豆粕期货主力合约K线图</h3>
-      <div className="h-[400px]">
-        <ReactECharts
-          option={getChartOption()}
-          style={{ height: '100%' }}
-          opts={{ renderer: 'svg' }}
-        />
-      </div>
+    <div className="bg-white rounded-lg p-4">
+      <div ref={chartRef} style={{ width: '100%', height: '400px' }} />
     </div>
   );
 };

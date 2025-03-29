@@ -6,10 +6,18 @@ export const API_ENDPOINTS = {
     etf: `${API_BASE_URL}/market/etf`,
     options: `${API_BASE_URL}/market/options`,
     futuresContracts: `${API_BASE_URL}/market/futures/contracts`,
-    futuresInventory: `${API_BASE_URL}/market/futures/inventory`
+    futuresInventory: `${API_BASE_URL}/market/futures/inventory`,
+    inventory: `${API_BASE_URL}/market/inventory`,
+    technical: `${API_BASE_URL}/market/technical`
   },
   analysis: {
-    daily: `${API_BASE_URL}/analysis/daily`
+    daily: `${API_BASE_URL}/analysis/daily`,
+    fundamental: `${API_BASE_URL}/fundamental/analysis`,
+    supplyDemand: `${API_BASE_URL}/fundamental/supply-demand`,
+    seasonal: `${API_BASE_URL}/fundamental/seasonal`,
+    weather: `${API_BASE_URL}/fundamental/weather`,
+    crushProfit: `${API_BASE_URL}/fundamental/crush-profit`,
+    overall: `${API_BASE_URL}/fundamental/overall`
   },
   model: {
     predict: `${API_BASE_URL}/model/predict`

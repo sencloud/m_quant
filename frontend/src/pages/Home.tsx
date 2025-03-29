@@ -1,78 +1,45 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import axios from 'axios';
 import { API_ENDPOINTS } from '../config/api';
 import Layout from '../components/layout/Layout';
 import MarketOverview from '../components/market/MarketOverview';
 import PriceChart from '../components/market/PriceChart';
-import TimeRangeSelector from '../components/home/TimeRangeSelector';
-import InventoryInfo from '../components/home/InventoryInfo';
-import FuturesKLineChart from '../components/home/FuturesKLineChart';
-
-interface FuturesData {
-  ts_code: string;
-  trade_date: string;
-  open: number;
-  high: number;
-  low: number;
-  close: number;
-  vol: number;
-  amount: number;
-}
-
-interface InventoryData {
-  total_inventory: number;
-  warehouse_inventory: number;
-  port_inventory: number;
-  update_date: string;
-}
+import TechnicalChart from '../components/market/TechnicalChart';
+import TechnicalIndicators from '../components/market/TechnicalIndicators';
+import InventoryChart from '../components/market/InventoryChart';
+import { ContractPrice, TechnicalIndicators as TechnicalIndicatorsType, InventoryData } from '../types/market';
 
 const Home: React.FC = () => {
-  const [timeRange, setTimeRange] = useState<'1m' | '3m' | '6m' | '1y'>('3m');
-
-  const getDateRange = (range: string) => {
-    const end = new Date();
-    const start = new Date();
-    
-    switch (range) {
-      case '1m':
-        start.setMonth(start.getMonth() - 1);
-        break;
-      case '3m':
-        start.setMonth(start.getMonth() - 3);
-        break;
-      case '6m':
-        start.setMonth(start.getMonth() - 6);
-        break;
-      case '1y':
-        start.setFullYear(start.getFullYear() - 1);
-        break;
-    }
-    
-    return {
-      start_date: start.toISOString().split('T')[0].replace(/-/g, ''),
-      end_date: end.toISOString().split('T')[0].replace(/-/g, '')
-    };
-  };
-
-  const { data: futuresData } = useQuery<FuturesData[]>({
-    queryKey: ['futuresData', timeRange],
+  // 获取期货数据
+  const { data: futuresData } = useQuery<ContractPrice[]>({
+    queryKey: ['futuresData'],
     queryFn: async () => {
-      const { start_date, end_date } = getDateRange(timeRange);
-      const response = await axios.get(API_ENDPOINTS.market.futuresContracts, {
-        params: { start_date, end_date }
-      });
+      const response = await axios.get(API_ENDPOINTS.market.futures);
       return response.data;
     }
   });
 
-  const { data: inventoryData } = useQuery<InventoryData>({
+  // 获取库存数据
+  const { data: inventoryData } = useQuery<InventoryData[]>({
     queryKey: ['inventoryData'],
     queryFn: async () => {
-      const response = await axios.get(API_ENDPOINTS.market.futuresInventory);
+      const response = await axios.get(API_ENDPOINTS.market.inventory);
       return response.data;
     }
   });
+
+  // 获取技术分析数据
+  const { data: technicalData } = useQuery<TechnicalIndicatorsType>({
+    queryKey: ['technicalIndicators'],
+    queryFn: async () => {
+      const response = await axios.get(API_ENDPOINTS.market.technical);
+      return response.data;
+    }
+  });
+
+  // 获取默认合约（豆粕）
+  const defaultContract = futuresData?.[0]?.historicalPrices ? futuresData[0] : null;
 
   return (
     <Layout>
@@ -107,8 +74,6 @@ const Home: React.FC = () => {
           </div>
         </div>
       </section>
-
-
 
       {/* Features Section */}
       <section className="py-12 bg-white">
@@ -162,6 +127,7 @@ const Home: React.FC = () => {
           </div>
         </div>
       </section>
+
       {/* Market Data Section */}
       <section id="market-data" className="py-12 bg-gray-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -172,21 +138,40 @@ const Home: React.FC = () => {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 gap-8">
+          {/* 市场概览 */}
+          <div className="mb-8">
             <MarketOverview />
-            <PriceChart />
           </div>
+
+          {/* 价格图表 */}
+          {defaultContract && defaultContract.historicalPrices && (
+            <div className="mb-8">
+              <PriceChart contract={defaultContract} />
+            </div>
+          )}
+
+          {/* 技术分析图表 */}
+          {defaultContract && defaultContract.historicalPrices && technicalData && (
+            <div className="mb-8">
+              <TechnicalChart technicalData={technicalData} contract={defaultContract} />
+            </div>
+          )}
+
+          {/* 技术分析指标 */}
+          {technicalData && (
+            <div className="mb-8">
+              <TechnicalIndicators data={technicalData} />
+            </div>
+          )}
+
+          {/* 库存图表 */}
+          {inventoryData && (
+            <div className="mb-8">
+              <InventoryChart data={inventoryData} />
+            </div>
+          )}
         </div>
       </section>
-      
-      {/* 时间范围选择 */}
-      {/* <TimeRangeSelector timeRange={timeRange} onTimeRangeChange={setTimeRange} /> */}
-
-      {/* 库存信息 */}
-      <InventoryInfo data={inventoryData} />
-
-      {/* K线图表 */}
-      <FuturesKLineChart data={futuresData} />
     </Layout>
   );
 };

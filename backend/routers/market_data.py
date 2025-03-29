@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException, Depends
 from typing import List, Optional
 from services.market_data import MarketDataService
-from models.market_data import FuturesData, ETFData, OptionsData
+from models.market_data import FuturesData, ETFData, OptionsData, InventoryData, TechnicalIndicators
 from utils.logger import logger
 
 router = APIRouter()
@@ -21,6 +21,12 @@ async def get_futures_data(
     logger.info(f"收到期货数据请求 - 品种: {symbol}, 开始日期: {start_date}, 结束日期: {end_date}")
     try:
         data = service.get_futures_data(start_date, end_date, symbol)
+        # 确保返回的数据包含完整的K线信息
+        for item in data:
+            if not hasattr(item, 'open') or not hasattr(item, 'high') or not hasattr(item, 'low'):
+                item.open = item.price
+                item.high = item.price
+                item.low = item.price
         logger.info(f"成功返回期货数据，共{len(data)}条记录")
         return data
     except Exception as e:
@@ -77,16 +83,54 @@ async def get_futures_contracts_data(
         logger.error(f"多合约数据请求失败: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.get("/futures/inventory")
-async def get_futures_inventory(
+@router.get("/inventory", response_model=List[InventoryData])
+async def get_inventory_data(
     service: MarketDataService = Depends(get_market_data_service)
 ):
     """获取豆粕库存数据"""
     logger.info("收到库存数据请求")
     try:
         data = service.get_futures_inventory()
-        logger.info("成功返回库存数据")
-        return data
+        if not data:
+            return []
+        
+        # 转换数据格式
+        inventory_list = []
+        for item in data.get("history_data", []):
+            # 计算环比和同比变化
+            current_value = item["inventory"]
+            previous_value = data.get("history_data", [])[1]["inventory"] if len(data.get("history_data", [])) > 1 else current_value
+            last_year_value = data.get("history_data", [])[12]["inventory"] if len(data.get("history_data", [])) > 12 else current_value
+            
+            mom_change = ((current_value - previous_value) / previous_value) * 100
+            yoy_change = ((current_value - last_year_value) / last_year_value) * 100
+            
+            inventory_list.append(InventoryData(
+                date=item["date"].strftime('%Y-%m-%d'),
+                value=float(current_value),
+                mom_change=float(mom_change),
+                yoy_change=float(yoy_change)
+            ))
+        
+        logger.info(f"成功返回库存数据，共{len(inventory_list)}条记录")
+        return inventory_list
     except Exception as e:
         logger.error(f"库存数据请求失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/technical", response_model=TechnicalIndicators)
+async def get_technical_indicators(
+    symbol: str = "M",
+    service: MarketDataService = Depends(get_market_data_service)
+):
+    """获取技术分析指标"""
+    logger.info(f"收到技术分析指标请求 - 品种: {symbol}")
+    try:
+        data = service.get_technical_indicators(symbol)
+        if not data:
+            raise HTTPException(status_code=404, detail="未找到技术分析指标数据")
+        logger.info("成功返回技术分析指标数据")
+        return data
+    except Exception as e:
+        logger.error(f"技术分析指标请求失败: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e)) 

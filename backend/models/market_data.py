@@ -1,17 +1,27 @@
-from pydantic import BaseModel
-from typing import Optional
+from pydantic import BaseModel, Field
+from typing import Optional, List
 from datetime import date
 
 class FuturesData(BaseModel):
     ts_code: str
     trade_date: str
+    pre_close: float
+    pre_settle: float
     open: float
     high: float
     low: float
     close: float
+    settle: float
+    change1: float
+    change2: float
     vol: float
     amount: float
-    change1: float
+    oi: float
+    oi_chg: float
+    contract: str
+    price: float
+    historicalPrices: List[dict] = Field(default_factory=list)
+    volume: Optional[float] = None
 
 class ETFData(BaseModel):
     ts_code: str
@@ -43,4 +53,22 @@ class OptionsData(BaseModel):
     exercise_price: float
     exercise_date: date
     list_date: date
-    delist_date: Optional[date] 
+    delist_date: Optional[date]
+
+class InventoryData(BaseModel):
+    date: str
+    value: float
+    mom_change: float  # 环比变化
+    yoy_change: float  # 同比变化
+
+class TechnicalIndicators(BaseModel):
+    contract: str
+    last_updated: str
+    current_price: float
+    price_targets: dict
+    ema: dict
+    macd: dict
+    rsi: dict
+    kdj: dict
+    bollinger_bands: dict
+    volume: dict 
