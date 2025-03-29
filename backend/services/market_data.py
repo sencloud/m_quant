@@ -19,31 +19,73 @@ class MarketDataService:
     def _get_futures_data(self, start_date: Optional[str] = None, end_date: Optional[str] = None, symbol: str = "M") -> Optional[pd.DataFrame]:
         """获取期货数据"""
         try:
-            if not start_date:
-                start_date = (datetime.now() - timedelta(days=365)).strftime('%Y%m%d')
-            if not end_date:
-                end_date = datetime.now().strftime('%Y%m%d')
-            
-            logger.info(f"开始获取期货数据 - 品种: {symbol}, 开始日期: {start_date}, 结束日期: {end_date}")
-            
             # 如果是品种代码，先获取主力合约
             if len(symbol) == 1:
-                logger.info(f"获取主力合约 - 品种: {symbol}, 日期: {end_date}")
+                logger.info(f"获取主力合约 - 品种: {symbol}")
+                # 获取最近的交易日
+                trade_cal = self.pro.trade_cal(
+                    exchange='DCE',
+                    is_open='1',
+                    start_date=(datetime.now() - timedelta(days=10)).strftime('%Y%m%d'),
+                    end_date=end_date if end_date else datetime.now().strftime('%Y%m%d')
+                )
+                if trade_cal is None or trade_cal.empty:
+                    logger.warning(f"未找到最近的交易日")
+                    return None
+                
+                # 获取小于等于请求结束日期的最后一个交易日
+                trade_cal = trade_cal[trade_cal['cal_date'] <= (end_date if end_date else datetime.now().strftime('%Y%m%d'))]
+                if trade_cal.empty:
+                    logger.warning(f"未找到小于等于{end_date}的交易日")
+                    return None
+                    
+                latest_trade_date = trade_cal.iloc[0]['cal_date']
+                logger.info(f"最近的交易日: {latest_trade_date}")
+                
                 # 获取主力合约
                 main_contract = self.pro.fut_mapping(
                     ts_code=symbol+'.DCE',
-                    trade_date=end_date
+                    trade_date=latest_trade_date
                 )
                 logger.info(f"主力合约查询结果: \n{main_contract}")
                 
                 if main_contract is None or main_contract.empty:
-                    logger.warning(f"未找到主力合约 - 品种: {symbol}, 日期: {end_date}")
+                    logger.warning(f"未找到主力合约 - 品种: {symbol}, 日期: {latest_trade_date}")
                     return None
                 symbol = main_contract.iloc[0]['mapping_ts_code']
                 logger.info(f"获取到主力合约: {symbol}")
             
+            # 获取合约基本信息
+            contract_info = self.pro.fut_basic(
+                ts_code=symbol,
+                exchange='DCE'
+            )
+            if contract_info is None or contract_info.empty:
+                logger.warning(f"未找到合约信息: {symbol}")
+                return None
+                
+            # 获取合约的实际交易日期范围
+            contract_start_date = contract_info.iloc[0]['list_date']
+            contract_end_date = contract_info.iloc[0]['delist_date']
+            
+            # 对于多合约请求，使用合约的实际交易日期范围
+            if len(symbol) > 1:  # 如果是具体合约代码（如M2401）
+                start_date = contract_start_date
+                end_date = contract_end_date if contract_end_date else datetime.now().strftime('%Y%m%d')
+            else:  # 如果是品种代码，使用用户指定的日期范围
+                if not start_date:
+                    start_date = contract_start_date
+                if not end_date:
+                    end_date = contract_end_date if contract_end_date else datetime.now().strftime('%Y%m%d')
+            
+            # 确保日期范围在合约交易期间内
+            start_date = max(start_date, contract_start_date)
+            if contract_end_date:
+                end_date = min(end_date, contract_end_date)
+            
+            logger.info(f"开始获取期货数据 - 品种: {symbol}, 开始日期: {start_date}, 结束日期: {end_date}")
+            
             # 获取合约数据
-            logger.info(f"获取合约数据 - 合约: {symbol}, 开始日期: {start_date}, 结束日期: {end_date}")
             df = self.pro.fut_daily(
                 ts_code=symbol,
                 start_date=start_date,
