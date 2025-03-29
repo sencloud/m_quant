@@ -29,14 +29,16 @@ class TradingService:
         """从数据库获取指定日期的策略分析"""
         try:
             db = self.SessionLocal()
-            analysis = db.query(StrategyAnalysisDB).filter(StrategyAnalysisDB.date == date).first()
+            # 将字符串日期转换为 date 对象
+            query_date = datetime.strptime(date, "%Y-%m-%d").date()
+            analysis = db.query(StrategyAnalysisDB).filter(StrategyAnalysisDB.date == query_date).first()
             if analysis:
                 return DailyStrategyAnalysis(
                     date=analysis.date,
                     reasoning_content=analysis.reasoning_content,
                     content=analysis.content,
-                    created_at=analysis.created_at,
-                    updated_at=analysis.updated_at
+                    created_at=analysis.created_at.date(),  # 转换为 date 对象
+                    updated_at=analysis.updated_at.date()   # 转换为 date 对象
                 )
             return None
         except Exception as e:

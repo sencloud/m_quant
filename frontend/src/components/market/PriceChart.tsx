@@ -108,7 +108,7 @@ const PriceChart: React.FC = () => {
   };
 
   return (
-    <div className="bg-white rounded-lg shadow-lg p-6">
+    <div className="bg-white rounded-lg p-6">
       <h3 className="text-lg font-medium text-gray-900 mb-4">豆粕期货主力合约K线图</h3>
       <div className="h-[400px]">
         <ReactECharts

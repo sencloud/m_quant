@@ -8,7 +8,7 @@ const Footer: React.FC = () => {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           {/* Company Info */}
           <div>
-            <h3 className="text-lg font-semibold mb-4">Singz Quant</h3>
+            <h3 className="text-lg font-semibold mb-4">豆粕组合策略</h3>
             <p className="text-gray-400 text-sm">
               专业的量化交易平台，为您提供全方位的市场数据分析和交易策略服务。
             </p>
@@ -82,7 +82,7 @@ const Footer: React.FC = () => {
 
         {/* Copyright */}
         <div className="mt-8 pt-8 border-t border-gray-800 text-center text-gray-400 text-sm">
-          <p>© {new Date().getFullYear()} Singz Quant. All rights reserved.</p>
+          <p>© {new Date().getFullYear()} 豆粕组合策略. All rights reserved.</p>
         </div>
       </div>
     </footer>

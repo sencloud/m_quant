@@ -24,7 +24,7 @@ const MarketOverview: React.FC = () => {
   const pctChange = latestData?.change1 ?? 0;
 
   return (
-    <div className="bg-white rounded-lg shadow-lg p-6">
+    <div className="bg-white rounded-lg p-6">
       <h3 className="text-xl font-semibold text-gray-900 mb-4">市场概览</h3>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="bg-gray-50 p-4 rounded-lg">

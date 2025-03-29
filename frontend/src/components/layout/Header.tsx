@@ -9,7 +9,11 @@ const Header: React.FC = () => {
           {/* Logo */}
           <div className="flex-shrink-0">
             <Link to="/" className="flex items-center">
-              <span className="text-2xl font-bold text-gray-900">Singz Quant</span>
+              <img src="/logo.png" alt="Logo" className="h-12 w-auto mr-3" />
+              <div className="flex flex-col">
+                <span className="text-2xl font-bold text-gray-900">豆粕组合策略</span>
+                <span className="text-sm text-gray-500">豆粕ETF、期货、期权</span>
+              </div>
             </Link>
           </div>
 
@@ -24,9 +28,9 @@ const Header: React.FC = () => {
             <Link to="/trading" className="text-gray-700 hover:text-gray-900 px-3 py-2 text-sm font-medium">
               交易策略
             </Link>
-            {/* <Link to="/research" className="text-gray-700 hover:text-gray-900 px-3 py-2 text-sm font-medium">
+            <Link to="/research" className="text-gray-700 hover:text-gray-900 px-3 py-2 text-sm font-medium">
               研究报告
-            </Link> */}
+            </Link>
           </nav>
 
           {/* Right side */}

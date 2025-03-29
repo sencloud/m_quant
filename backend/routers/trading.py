@@ -23,7 +23,7 @@ client = OpenAI(
 def get_trading_service() -> TradingService:
     return TradingService()
 
-async def stream_response(response, request: Request):
+async def stream_response(response, request: Request, date: str):
     reasoning_content = ""
     content = ""
     
@@ -47,6 +47,20 @@ async def stream_response(response, request: Request):
         
         # 发送完成标记
         yield f"data: {json.dumps({'type': 'done', 'reasoning': reasoning_content, 'content': content})}\n\n"
+        
+        # 保存到数据库
+        try:
+            trading_service = TradingService()
+            analysis = DailyStrategyAnalysis(
+                date=date,  # 使用用户选择的日期
+                content=content,
+                reasoning_content=reasoning_content
+            )
+            trading_service.save_strategy_analysis(analysis)
+            logger.info(f"策略分析已保存到数据库 - 日期: {date}")
+        except Exception as e:
+            logger.error(f"保存策略分析到数据库失败: {str(e)}")
+            
     except Exception as e:
         logger.error(f"流式响应出错: {str(e)}", exc_info=True)
         yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
@@ -71,9 +85,9 @@ async def get_options_strategies(
             }
 
         # 如果数据库中没有，则调用Deepseek API
-        logger.info(f"数据库中没有找到策略分析，开始调用Deepseek API - 日期: {date}")
+        logger.info("数据库中没有找到策略分析，开始调用Deepseek API")
         
-        prompt = """基于今天的豆粕市场环境，我做出如下交易选择，你评估下是否合适
+        prompt = f"""今天是{date}，请基于今天的豆粕市场环境，我做出如下交易选择，你评估下是否合适
 开空：豆粕2509合约期货
 买多2509 3200的期权
 买跌2505 2750的期权"""
@@ -86,7 +100,7 @@ async def get_options_strategies(
             )
             
             return StreamingResponse(
-                stream_response(response, request),
+                stream_response(response, request, date),
                 media_type="text/event-stream",
                 background=BackgroundTask(logger.info, "请求处理完成")
             )
@@ -113,7 +127,7 @@ async def generate_strategy(prompt: str, request: Request):
             )
             
             return StreamingResponse(
-                stream_response(response, request),
+                stream_response(response, request, datetime.now().strftime("%Y-%m-%d")),
                 media_type="text/event-stream",
                 background=BackgroundTask(logger.info, "请求处理完成")
             )

@@ -81,7 +81,7 @@ const Home: React.FC = () => {
         <div className="max-w-7xl mx-auto py-16 px-4 sm:px-6 lg:px-8">
           <div className="text-center">
             <h1 className="text-4xl font-bold tracking-tight sm:text-5xl md:text-6xl">
-              专业的量化交易平台
+              专业的量化交易策略平台
             </h1>
             <p className="mt-3 max-w-md mx-auto text-base sm:text-lg md:mt-5 md:text-xl md:max-w-3xl">
               提供全方位的市场数据分析、技术分析和交易策略服务，助力您的投资决策。
@@ -92,7 +92,7 @@ const Home: React.FC = () => {
                   href="#market-data"
                   className="w-full flex items-center justify-center px-8 py-3 border border-transparent text-base font-medium rounded-md text-blue-700 bg-white hover:bg-gray-50 md:py-4 md:text-lg md:px-10"
                 >
-                  开始交易
+                  探索
                 </a>
               </div>
               <div className="mt-3 sm:mt-0 sm:ml-3">
@@ -172,7 +172,7 @@ const Home: React.FC = () => {
             </p>
           </div>
 
-          <div className="space-y-8">
+          <div className="grid grid-cols-1 gap-8">
             <MarketOverview />
             <PriceChart />
           </div>

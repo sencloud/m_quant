@@ -9,7 +9,7 @@ class Settings(BaseSettings):
     DEEPSEEK_API_KEY: str
     
     # 应用配置
-    PROJECT_NAME: str = "Singz Quant"
+    PROJECT_NAME: str = "豆粕组合策略"
     API_V1_STR: str = "/api/v1"
     
     # 数据库配置
