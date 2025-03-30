@@ -141,6 +141,7 @@ const PriceChart: React.FC<PriceChartProps> = ({ contract }) => {
 
   return (
     <div className="bg-white rounded-lg p-4">
+      <h3 className="text-xl font-semibold text-gray-900 mb-4">价格走势</h3>
       <div ref={chartRef} style={{ width: '100%', height: '400px' }} />
     </div>
   );

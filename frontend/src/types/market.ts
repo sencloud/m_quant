@@ -88,4 +88,42 @@ export interface InventoryResponse {
       yoy_change: number;
     };
   };
+}
+
+export interface OptionBasic {
+  ts_code: string;
+  exchange: string;
+  name: string;
+  per_unit: string;
+  opt_code: string;
+  opt_type: string;
+  call_put: string;
+  exercise_type: string;
+  exercise_price: number;
+  s_month: string;
+  maturity_date: string;
+  list_price: number;
+  list_date: string;
+  delist_date: string;
+  last_edate: string;
+  last_ddate: string;
+  quote_unit: string;
+  min_price_chg: string;
+  underlying_symbol: string;
+}
+
+export interface OptionDaily {
+  ts_code: string;
+  trade_date: string;
+  exchange: string;
+  amount: number;
+  close: number;
+  high: number;
+  low: number;
+  oi: number;
+  open: number;
+  pre_close: number | null;
+  pre_settle: number;
+  settle: number;
+  vol: number;
 } 

@@ -1,14 +1,23 @@
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Query
 from typing import List, Optional
 from services.market_data import MarketDataService
-from models.market_data import FuturesData, ETFData, OptionsData, InventoryData, TechnicalIndicators
+from services.opt_service import OptService
+from models.market_data import FuturesData, ETFData, OptionsData, InventoryData, TechnicalIndicators, OptionsHedgeData, OptionBasic, OptionDaily
 from utils.logger import logger
+from datetime import datetime, timedelta
 
 router = APIRouter()
 
 def get_market_data_service() -> MarketDataService:
     logger.debug("创建市场数据服务实例")
-    return MarketDataService()
+    service = MarketDataService()
+    if not hasattr(service, 'pro') or service.pro is None:
+        logger.error("MarketDataService 初始化失败，Tushare API 不可用")
+    return service
+
+def get_opt_service() -> OptService:
+    logger.debug("创建期权服务实例")
+    return OptService()
 
 @router.get("/futures", response_model=List[FuturesData])
 async def get_futures_data(
@@ -133,4 +142,74 @@ async def get_technical_indicators(
         return data
     except Exception as e:
         logger.error(f"技术分析指标请求失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/options/hedge", response_model=List[OptionsHedgeData])
+async def get_options_hedge_data(
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    hedge_type: str = "delta",
+    service: MarketDataService = Depends(get_market_data_service)
+):
+    """获取期权对冲策略数据"""
+    logger.info(f"收到期权对冲数据请求 - 开始日期: {start_date}, 结束日期: {end_date}, 对冲类型: {hedge_type}")
+    try:
+        data = service.get_options_hedge_data(start_date, end_date, hedge_type)
+        if not data:
+            raise HTTPException(status_code=404, detail="未找到期权对冲数据")
+        logger.info(f"成功返回期权对冲数据，共{len(data)}条记录")
+        return data
+    except Exception as e:
+        logger.error(f"期权对冲数据请求失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/options/basic", response_model=List[OptionBasic])
+async def get_option_basics(
+    service: OptService = Depends(get_opt_service)
+):
+    """获取期权基础信息"""
+    try:
+        logger.info("收到期权基础信息请求")
+        result = await service.get_option_basics()
+        logger.info(f"成功获取期权基础信息，共{len(result)}条记录")
+        return result
+    except Exception as e:
+        logger.error(f"获取期权基础信息失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/options/daily", response_model=List[OptionDaily])
+async def get_option_daily(
+    service: OptService = Depends(get_opt_service)
+):
+    """获取期权日线数据"""
+    try:
+        logger.info("收到期权日线行情数据请求")
+        result = await service.get_option_daily()
+        logger.info(f"成功获取期权日线数据，共{len(result)}条记录")
+        return result
+    except Exception as e:
+        logger.error(f"期权日线行情数据请求失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/options/daily/{ts_code}", response_model=List[OptionDaily])
+async def get_option_daily_by_code(
+    ts_code: str,
+    service: OptService = Depends(get_opt_service)
+):
+    """获取指定期权的日线数据"""
+    try:
+        logger.info(f"收到期权日线行情数据请求 - TS代码: {ts_code}")
+        # 计算一年前的日期
+        end_date = datetime.now()
+        start_date = end_date - timedelta(days=365)
+        
+        result = await service.get_option_daily_by_code(
+            ts_code=ts_code,
+            start_date=start_date.strftime("%Y%m%d"),
+            end_date=end_date.strftime("%Y%m%d")
+        )
+        logger.info(f"成功获取期权 {ts_code} 的日线数据，共{len(result)}条记录")
+        return result
+    except Exception as e:
+        logger.error(f"获取期权 {ts_code} 的日线数据失败: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e)) 

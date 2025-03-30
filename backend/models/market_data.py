@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import Optional, List
+from typing import Optional, List, Union
 from datetime import date
 
 class FuturesData(BaseModel):
@@ -71,4 +71,45 @@ class TechnicalIndicators(BaseModel):
     rsi: dict
     kdj: dict
     bollinger_bands: dict
-    volume: dict 
+    volume: dict
+
+class OptionsHedgeData(BaseModel):
+    ts_code: str
+    trade_date: str
+    futures_price: float
+    options_price: float
+    delta: float
+    gamma: float
+    theta: float
+    vega: float
+    hedge_ratio: float
+    pl: float
+    cumulative_pl: float
+    signal: str
+    volatility: float
+    risk_exposure: Optional[float] = None
+
+class OptionBasic(BaseModel):
+    ts_code: str
+    name: str
+    exercise_price: float
+    maturity_date: str
+    call_put: str
+    exchange: str = 'DCE'  # 默认为大连商品交易所
+    opt_code: Optional[str] = None  # 标准期权代码
+    underlying_code: Optional[str] = None  # 标的代码
+
+class OptionDaily(BaseModel):
+    ts_code: str
+    trade_date: str
+    exchange: str = 'DCE'  # 默认为大连商品交易所
+    pre_settle: Optional[float] = None
+    pre_close: Optional[float] = None
+    open: Optional[float] = None
+    high: Optional[float] = None
+    low: Optional[float] = None
+    close: Optional[float] = None
+    settle: Optional[float] = None
+    vol: Optional[float] = None
+    amount: Optional[float] = None
+    oi: Optional[float] = None 

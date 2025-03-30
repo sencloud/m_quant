@@ -103,6 +103,7 @@ const InventoryChart: React.FC<InventoryChartProps> = ({ data }) => {
       padding: '24px', 
       borderRadius: '8px'
     }}>
+      <h3 className="text-xl font-semibold text-gray-900 mb-4">库存情况</h3>
       <div ref={chartRef} style={{ width: '100%', height: '400px' }} />
     </div>
   );

@@ -238,6 +238,7 @@ const TechnicalChart: React.FC<TechnicalChartProps> = ({ technicalData, contract
 
   return (
     <div className="bg-white rounded-lg p-4">
+      <h3 className="text-xl font-semibold text-gray-900 mb-4">技术分析图表</h3>
       <div ref={chartRef} style={{ width: '100%', height: '600px' }} />
     </div>
   );

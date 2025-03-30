@@ -11,14 +11,28 @@ from utils.logger import logger
 class MarketDataService:
     def __init__(self):
         logger.info("初始化市场数据服务")
-        ts.set_token(settings.TUSHARE_TOKEN)
-        self.pro = ts.pro_api()
-        self.logger = logger
-        logger.debug("Tushare API初始化完成")
+        try:
+            token = settings.TUSHARE_TOKEN
+            if not token:
+                logger.error("未找到 TUSHARE_TOKEN，请在 .env 文件中设置")
+                self.pro = None
+            else:
+                ts.set_token(token)
+                self.pro = ts.pro_api()
+                self.logger = logger
+                logger.debug("Tushare API初始化完成")
+        except Exception as e:
+            logger.error(f"市场数据服务初始化失败: {str(e)}")
+            self.pro = None
+            self.logger = logger
 
     def _get_futures_data(self, start_date: Optional[str] = None, end_date: Optional[str] = None, symbol: str = "M") -> List[FuturesData]:
         """获取期货数据"""
         try:
+            if self.pro is None:
+                logger.error("Tushare API 未初始化，无法获取期货数据")
+                return []
+                
             # 如果是品种代码，先获取主力合约
             if len(symbol) == 1:
                 logger.info(f"获取主力合约 - 品种: {symbol}")
@@ -597,7 +611,99 @@ class MarketDataService:
             indicators = self.calculate_technical_indicators(df)
             logger.info(f"成功计算技术分析指标: {indicators}")
             return indicators
-            
         except Exception as e:
             logger.error(f"获取技术分析指标失败: {str(e)}")
-            return {} 
+            return {}
+
+    def get_options_hedge_data(
+        self,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
+        hedge_type: str = "delta"
+    ) -> List[dict]:
+        """获取期权对冲数据
+        
+        Args:
+            start_date: 开始日期，格式为YYYYMMDD
+            end_date: 结束日期，格式为YYYYMMDD
+            hedge_type: 对冲类型，可选值为'delta'或'delta_gamma'
+            
+        Returns:
+            期权对冲数据列表
+        """
+        logger.info(f"获取期权对冲数据 - 开始日期: {start_date}, 结束日期: {end_date}, 对冲类型: {hedge_type}")
+        try:
+            # 如果未指定日期，则默认获取最近3个月数据
+            if not start_date:
+                start_date = (datetime.now() - timedelta(days=90)).strftime('%Y%m%d')
+            if not end_date:
+                end_date = datetime.now().strftime('%Y%m%d')
+                
+            # 获取期货数据作为基础
+            futures_data = self._get_futures_data(start_date, end_date, "M")
+            if not futures_data:
+                logger.warning("未获取到期货数据")
+                return []
+                
+            # 将期货数据转换为DataFrame
+            df_futures = pd.DataFrame([{
+                'ts_code': item.ts_code,
+                'trade_date': item.trade_date,
+                'futures_price': item.close
+            } for item in futures_data])
+            
+            # 模拟期权价格和希腊字母数据
+            df_futures['options_price'] = df_futures['futures_price'] * 0.05  # 模拟期权价格
+            
+            # 根据对冲类型生成不同的希腊字母值
+            if hedge_type == "delta":
+                df_futures['delta'] = 0.5 + (np.random.random(len(df_futures)) - 0.5) * 0.2
+                df_futures['gamma'] = 0.05 + np.random.random(len(df_futures)) * 0.05
+                df_futures['theta'] = -0.02 - np.random.random(len(df_futures)) * 0.01
+                df_futures['vega'] = 0.1 + np.random.random(len(df_futures)) * 0.05
+                
+                # 仅使用delta进行对冲
+                df_futures['hedge_ratio'] = df_futures['delta']
+            else:  # delta-gamma对冲
+                df_futures['delta'] = 0.5 + (np.random.random(len(df_futures)) - 0.5) * 0.2
+                df_futures['gamma'] = 0.05 + np.random.random(len(df_futures)) * 0.05
+                df_futures['theta'] = -0.02 - np.random.random(len(df_futures)) * 0.01
+                df_futures['vega'] = 0.1 + np.random.random(len(df_futures)) * 0.05
+                
+                # Delta-Gamma对冲考虑gamma因素
+                df_futures['hedge_ratio'] = df_futures['delta'] + 0.5 * df_futures['gamma'] * df_futures['futures_price'] * 0.01
+            
+            # 计算P&L
+            df_futures['pl'] = np.random.normal(0, 1, len(df_futures)) * 100  # 随机生成每日P&L
+            
+            # 计算累计P&L
+            df_futures['cumulative_pl'] = df_futures['pl'].cumsum()
+            
+            # 生成波动率
+            df_futures['volatility'] = 0.2 + np.random.random(len(df_futures)) * 0.1
+            
+            # 生成风险敞口
+            df_futures['risk_exposure'] = df_futures['futures_price'] * (1 - df_futures['hedge_ratio']) * 0.1
+            
+            # 生成信号
+            conditions = [
+                (df_futures['delta'] > 0.6),
+                (df_futures['delta'] < 0.4),
+                (df_futures['delta'] >= 0.4) & (df_futures['delta'] <= 0.6)
+            ]
+            choices = ['increase_hedge', 'decrease_hedge', 'maintain']
+            df_futures['signal'] = np.select(conditions, choices, default='maintain')
+            
+            # 按日期排序
+            df_futures = df_futures.sort_values('trade_date')
+            
+            # 转换为字典列表返回
+            result = df_futures.to_dict('records')
+            logger.info(f"成功生成期权对冲数据，共{len(result)}条记录")
+            return result
+            
+        except Exception as e:
+            logger.error(f"获取期权对冲数据失败: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            return [] 

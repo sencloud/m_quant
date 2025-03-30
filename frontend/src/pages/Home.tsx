@@ -8,11 +8,13 @@ import PriceChart from '../components/market/PriceChart';
 import TechnicalChart from '../components/market/TechnicalChart';
 import TechnicalIndicators from '../components/market/TechnicalIndicators';
 import InventoryChart from '../components/market/InventoryChart';
-import { ContractPrice, TechnicalIndicators as TechnicalIndicatorsType, InventoryData } from '../types/market';
+import OptionData from '../components/market/OptionData';
+import { ContractPrice, TechnicalIndicators as TechnicalIndicatorsType, InventoryData, OptionBasic, OptionDaily } from '../types/market';
+import { Skeleton, Card } from 'antd';
 
 const Home: React.FC = () => {
   // 获取期货数据
-  const { data: futuresData } = useQuery<ContractPrice[]>({
+  const { data: futuresData, isLoading: isFuturesLoading } = useQuery<ContractPrice[]>({
     queryKey: ['futuresData'],
     queryFn: async () => {
       const response = await axios.get(API_ENDPOINTS.market.futures);
@@ -21,7 +23,7 @@ const Home: React.FC = () => {
   });
 
   // 获取库存数据
-  const { data: inventoryData } = useQuery<InventoryData[]>({
+  const { data: inventoryData, isLoading: isInventoryLoading } = useQuery<InventoryData[]>({
     queryKey: ['inventoryData'],
     queryFn: async () => {
       const response = await axios.get(API_ENDPOINTS.market.inventory);
@@ -30,7 +32,7 @@ const Home: React.FC = () => {
   });
 
   // 获取技术分析数据
-  const { data: technicalData } = useQuery<TechnicalIndicatorsType>({
+  const { data: technicalData, isLoading: isTechnicalLoading } = useQuery<TechnicalIndicatorsType>({
     queryKey: ['technicalIndicators'],
     queryFn: async () => {
       const response = await axios.get(API_ENDPOINTS.market.technical);
@@ -38,8 +40,39 @@ const Home: React.FC = () => {
     }
   });
 
+  // 获取期权日线数据
+  const { data: optionDaily, isLoading: isOptionDailyLoading } = useQuery<OptionDaily[]>({
+    queryKey: ['optionDaily'],
+    queryFn: async () => {
+      const response = await axios.get(API_ENDPOINTS.market.options + '/daily');
+      return response.data;
+    },
+    refetchInterval: false,
+    refetchOnWindowFocus: false,
+    staleTime: 5 * 60 * 1000
+  });
+
+  // 获取期权合约基本信息
+  const { data: optionBasics, isLoading: isOptionBasicsLoading } = useQuery<OptionBasic[]>({
+    queryKey: ['optionBasics'],
+    queryFn: async () => {
+      const response = await axios.get(API_ENDPOINTS.market.options + '/basic');
+      return response.data;
+    },
+    refetchInterval: false,
+    refetchOnWindowFocus: false,
+    staleTime: 5 * 60 * 1000
+  });
+
   // 获取默认合约（豆粕）
   const defaultContract = futuresData?.[0]?.historicalPrices ? futuresData[0] : null;
+
+  // 骨架屏组件
+  const ChartSkeleton = () => (
+    <Card className="mb-8">
+      <Skeleton.Input active block style={{ height: 400 }} />
+    </Card>
+  );
 
   return (
     <Layout>
@@ -140,35 +173,70 @@ const Home: React.FC = () => {
 
           {/* 市场概览 */}
           <div className="mb-8">
-            <MarketOverview />
+            {isFuturesLoading ? (
+              <Card>
+                <Skeleton active paragraph={{ rows: 3 }} />
+              </Card>
+            ) : (
+              <MarketOverview />
+            )}
           </div>
 
           {/* 价格图表 */}
-          {defaultContract && defaultContract.historicalPrices && (
-            <div className="mb-8">
-              <PriceChart contract={defaultContract} />
-            </div>
+          {isFuturesLoading ? (
+            <ChartSkeleton />
+          ) : (
+            defaultContract && defaultContract.historicalPrices && (
+              <div className="mb-8">
+                <PriceChart contract={defaultContract} />
+              </div>
+            )
           )}
 
           {/* 技术分析图表 */}
-          {defaultContract && defaultContract.historicalPrices && technicalData && (
-            <div className="mb-8">
-              <TechnicalChart technicalData={technicalData} contract={defaultContract} />
-            </div>
+          {isFuturesLoading || isTechnicalLoading ? (
+            <ChartSkeleton />
+          ) : (
+            defaultContract && defaultContract.historicalPrices && technicalData && (
+              <div className="mb-8">
+                <TechnicalChart technicalData={technicalData} contract={defaultContract} />
+              </div>
+            )
           )}
 
           {/* 技术分析指标 */}
-          {technicalData && (
-            <div className="mb-8">
-              <TechnicalIndicators data={technicalData} />
-            </div>
+          {isTechnicalLoading ? (
+            <Card className="mb-8">
+              <Skeleton active paragraph={{ rows: 4 }} />
+            </Card>
+          ) : (
+            technicalData && (
+              <div className="mb-8">
+                <TechnicalIndicators data={technicalData} />
+              </div>
+            )
           )}
 
           {/* 库存图表 */}
-          {inventoryData && (
-            <div className="mb-8">
-              <InventoryChart data={inventoryData} />
-            </div>
+          {isInventoryLoading ? (
+            <ChartSkeleton />
+          ) : (
+            inventoryData && (
+              <div className="mb-8">
+                <InventoryChart data={inventoryData} />
+              </div>
+            )
+          )}
+          
+          {/* 期权数据 */}
+          {isOptionBasicsLoading || isOptionDailyLoading ? (
+            <Card className="mb-8">
+              <Skeleton.Input active block style={{ height: 600 }} />
+            </Card>
+          ) : (
+            optionBasics && optionDaily && (
+              <OptionData optionBasics={optionBasics} optionDaily={optionDaily} />
+            )
           )}
         </div>
       </section>
