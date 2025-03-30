@@ -1,16 +1,25 @@
 from fastapi import APIRouter, HTTPException
 from services.fundamental import FundamentalAnalyzer
+from utils.logger import logger
+from datetime import datetime
 from typing import Dict, Any
 
 router = APIRouter()
 analyzer = FundamentalAnalyzer()
 
 @router.get("/analysis")
-async def get_fundamental_analysis() -> Dict[str, Any]:
+async def get_fundamental_analysis(date: str):
     """获取基本面分析数据"""
     try:
-        return await analyzer.get_fundamental_analysis()
+        # 验证日期格式
+        try:
+            datetime.strptime(date, "%Y-%m-%d")
+        except ValueError:
+            raise HTTPException(status_code=400, detail="日期格式错误，请使用YYYY-MM-DD格式")
+            
+        return await analyzer.get_fundamental_analysis(date)
     except Exception as e:
+        logger.error(f"获取基本面分析失败: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/supply-demand")

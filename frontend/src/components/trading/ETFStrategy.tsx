@@ -27,15 +27,15 @@ interface ETFData {
 }
 
 const ETFStrategy: React.FC = () => {
-  const [timeRange, setTimeRange] = useState<'1m' | '3m' | '6m' | '1y'>('3m');
+  const [timeRange, setTimeRange] = useState<'3m' | '6m' | '1y' | '3y'>('1y');
 
   const getDateRange = (range: string) => {
     const end = new Date();
     const start = new Date();
     
     switch (range) {
-      case '1m':
-        start.setMonth(start.getMonth() - 1);
+      case '3y':
+        start.setFullYear(start.getFullYear() - 3);
         break;
       case '3m':
         start.setMonth(start.getMonth() - 3);
@@ -149,7 +149,7 @@ const ETFStrategy: React.FC = () => {
         {
           name: 'MA5',
           type: 'line',
-          data: ma5Data,
+          data: ma5Data.map(item => [item[0], parseFloat(item[1].toString()).toFixed(3)]),
           smooth: true,
           lineStyle: {
             opacity: 0.5,
@@ -160,7 +160,7 @@ const ETFStrategy: React.FC = () => {
         {
           name: 'MA8',
           type: 'line',
-          data: ma8Data,
+          data: ma8Data.map(item => [item[0], parseFloat(item[1].toString()).toFixed(3)]),
           smooth: true,
           lineStyle: {
             opacity: 0.5,
@@ -183,22 +183,13 @@ const ETFStrategy: React.FC = () => {
       <div className="bg-gray-50 p-4 rounded-lg">
         <h3 className="text-lg font-medium text-gray-900 mb-2">策略说明</h3>
         <p className="text-gray-600">
-          基于5日均线和8日均线的金叉/死叉策略。当5日均线上穿8日均线时产生买入信号，
-          当5日均线下穿8日均线时产生卖出信号。使用ATR进行风险管理，止损设置为1.8倍ATR，
+          基于5日均线和8日均线的金叉做多策略。当5日均线上穿8日均线时产生买入信号。使用ATR进行风险管理，止损设置为1.8倍ATR，
           止盈设置为2.6倍ATR。
         </p>
       </div>
 
       {/* 时间范围选择 */}
       <div className="flex space-x-4">
-        <button
-          onClick={() => setTimeRange('1m')}
-          className={`px-4 py-2 rounded-md ${
-            timeRange === '1m' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700'
-          }`}
-        >
-          1个月
-        </button>
         <button
           onClick={() => setTimeRange('3m')}
           className={`px-4 py-2 rounded-md ${
@@ -222,6 +213,14 @@ const ETFStrategy: React.FC = () => {
           }`}
         >
           1年
+        </button>
+        <button
+          onClick={() => setTimeRange('3y')}
+          className={`px-4 py-2 rounded-md ${
+            timeRange === '3y' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700'
+          }`}
+        >
+          3年
         </button>
       </div>
 

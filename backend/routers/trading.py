@@ -17,7 +17,7 @@ router = APIRouter()
 # 初始化OpenAI客户端
 client = OpenAI(
     api_key=settings.DEEPSEEK_API_KEY,
-    base_url="https://api.deepseek.com"
+    base_url="https://ark.cn-beijing.volces.com/api/v3/bots"
 )
 
 def get_trading_service() -> TradingService:
@@ -35,12 +35,17 @@ async def stream_response(response, request: Request, date: str):
                 break
                 
             try:
-                if chunk.choices[0].delta.reasoning_content:
-                    reasoning_content += chunk.choices[0].delta.reasoning_content
-                    yield f"data: {json.dumps({'type': 'reasoning', 'content': reasoning_content})}\n\n"
-                elif chunk.choices[0].delta.content:
+                if hasattr(chunk, "references"):
+                    print(chunk.references)
+                if not chunk.choices:
+                    continue
+                if chunk.choices[0].delta.content:
                     content += chunk.choices[0].delta.content
                     yield f"data: {json.dumps({'type': 'content', 'content': content})}\n\n"
+                elif hasattr(chunk.choices[0].delta, "reasoning_content"):
+                    reasoning_content += chunk.choices[0].delta.reasoning_content
+                    yield f"data: {json.dumps({'type': 'reasoning', 'content': reasoning_content})}\n\n"
+                    
             except Exception as e:
                 logger.error(f"处理chunk时出错: {str(e)}")
                 continue
@@ -87,15 +92,36 @@ async def get_options_strategies(
         # 如果数据库中没有，则调用Deepseek API
         logger.info("数据库中没有找到策略分析，开始调用Deepseek API")
         
-        prompt = f"""今天是{date}，请基于今天的豆粕市场环境，我做出如下交易选择，你评估下是否合适
-开空：豆粕2509合约期货
-买多2509 3200的期权
-买跌2505 2750的期权"""
+        prompt = f"""请基于{date}的市场数据，对豆粕期货和期权市场进行全面分析，必须从数据出发，不能做任何假设，只能从互联网上获取数据，或根据你已有的知识，包含以下维度：
+
+1. 库存周期验证
+- 当前库存水平及其对价格的影响
+- 库存拐点预判，重点关注巴西大豆到港量
+- 提供环比和同比变化数据
+
+2. 技术面分析
+- 周线趋势研判，包括波浪理论分析
+- 日线和小时线关键支撑压力位
+- 波动率分析及相应期权策略建议
+
+3. 历史价格分析
+- 十年历史价格区间分析
+- 季节性规律研究
+
+4. 资讯与政策影响
+- 短期可能的利多因素分析
+- 潜在风险事件评估
+
+5. 生猪市场联动分析
+- 从需求端验证市场状况
+- 替代品（如菜粕）对市场的影响
+
+请提供详细的数据支持和具体的价格区间。"""
         
         try:
             response = client.chat.completions.create(
-                model="deepseek-reasoner",
-                messages=[{"role": "user", "content": prompt}],
+                model="bot-20250329163710-8zcqm",
+                messages=[{"role": "system", "content": "你是DeepSeek，是一个金融领域专家"}, {"role": "user", "content": prompt}],
                 stream=True
             )
             
@@ -111,31 +137,6 @@ async def get_options_strategies(
             
     except Exception as e:
         logger.error(f"获取期权策略分析失败: {str(e)}", exc_info=True)
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
-
-@router.post("/generate-strategy")
-async def generate_strategy(prompt: str, request: Request):
-    """根据提示生成交易策略"""
-    try:
-        logger.info(f"开始生成策略，prompt: {prompt}")
-        
-        try:
-            response = client.chat.completions.create(
-                model="deepseek-reasoner",
-                messages=[{"role": "user", "content": prompt}],
-                stream=True
-            )
-            
-            return StreamingResponse(
-                stream_response(response, request, datetime.now().strftime("%Y-%m-%d")),
-                media_type="text/event-stream",
-                background=BackgroundTask(logger.info, "请求处理完成")
-            )
-            
-        except Exception as e:
-            logger.error(f"API调用失败: {str(e)}", exc_info=True)
-            raise HTTPException(status_code=500, detail=f"API调用失败: {str(e)}")
-            
-    except Exception as e:
-        logger.error(f"生成策略失败: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e)) 

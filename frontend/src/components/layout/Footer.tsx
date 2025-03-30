@@ -1,7 +1,14 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
+import { Link, NavLink } from 'react-router-dom';
 
 const Footer: React.FC = () => {
+  // 定义活动链接的类名函数
+  const getLegalLinkClass = ({ isActive }: { isActive: boolean }) => {
+    return isActive 
+      ? "text-white font-medium text-sm underline"
+      : "text-gray-400 hover:text-white text-sm";
+  };
+
   return (
     <footer className="bg-gray-900 text-white">
       <div className="max-w-7xl mx-auto py-12 px-4 sm:px-6 lg:px-8">
@@ -10,7 +17,7 @@ const Footer: React.FC = () => {
           <div>
             <h3 className="text-lg font-semibold mb-4">豆粕组合策略</h3>
             <p className="text-gray-400 text-sm">
-              专业的量化交易平台，为您提供全方位的市场数据分析和交易策略服务。
+              本站是豆粕品种量化交易策略平台，为您提供全方位的市场数据分析和交易策略服务。
             </p>
           </div>
 
@@ -18,16 +25,6 @@ const Footer: React.FC = () => {
           <div>
             <h3 className="text-lg font-semibold mb-4">快速链接</h3>
             <ul className="space-y-2">
-              <li>
-                <Link to="/market" className="text-gray-400 hover:text-white text-sm">
-                  市场数据
-                </Link>
-              </li>
-              <li>
-                <Link to="/analysis" className="text-gray-400 hover:text-white text-sm">
-                  技术分析
-                </Link>
-              </li>
               <li>
                 <Link to="/trading" className="text-gray-400 hover:text-white text-sm">
                   交易策略
@@ -38,6 +35,31 @@ const Footer: React.FC = () => {
                   研究报告
                 </Link>
               </li>
+              <li>
+                <a href="http://www.dce.com.cn/" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-white text-sm">
+                  大连商品交易所
+                </a>
+              </li>
+              <li>
+                <a href="https://www.usda.gov/" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-white text-sm">
+                  美国农业部
+                </a>
+              </li>
+              <li>
+                <a href="http://www.customs.gov.cn/" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-white text-sm">
+                  中国海关总署
+                </a>
+              </li>
+              <li>
+                <a href="https://wallstreetcn.com/calendar" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-white text-sm">
+                  交易日历
+                </a>
+              </li>
+              <li>
+                <a href="https://tushare.pro/" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-white text-sm">
+                  Tushare
+                </a>
+              </li>
             </ul>
           </div>
 
@@ -46,19 +68,19 @@ const Footer: React.FC = () => {
             <h3 className="text-lg font-semibold mb-4">法律信息</h3>
             <ul className="space-y-2">
               <li>
-                <Link to="/privacy" className="text-gray-400 hover:text-white text-sm">
+                <NavLink to="/privacy" className={getLegalLinkClass}>
                   隐私政策
-                </Link>
+                </NavLink>
               </li>
               <li>
-                <Link to="/terms" className="text-gray-400 hover:text-white text-sm">
+                <NavLink to="/terms" className={getLegalLinkClass}>
                   服务条款
-                </Link>
+                </NavLink>
               </li>
               <li>
-                <Link to="/disclaimer" className="text-gray-400 hover:text-white text-sm">
+                <NavLink to="/disclaimer" className={getLegalLinkClass}>
                   免责声明
-                </Link>
+                </NavLink>
               </li>
             </ul>
           </div>
@@ -70,19 +92,13 @@ const Footer: React.FC = () => {
               <li className="text-gray-400 text-sm">
                 邮箱：contact@singzquant.com
               </li>
-              <li className="text-gray-400 text-sm">
-                电话：+86 123 4567 8900
-              </li>
-              <li className="text-gray-400 text-sm">
-                地址：北京市朝阳区xxx大厦
-              </li>
             </ul>
           </div>
         </div>
 
         {/* Copyright */}
         <div className="mt-8 pt-8 border-t border-gray-800 text-center text-gray-400 text-sm">
-          <p>© {new Date().getFullYear()} 豆粕组合策略. All rights reserved.</p>
+          <p>© {new Date().getFullYear()} 新致智能量化. All rights reserved.</p>
         </div>
       </div>
     </footer>

@@ -48,7 +48,7 @@ const Home: React.FC = () => {
         <div className="max-w-7xl mx-auto py-16 px-4 sm:px-6 lg:px-8">
           <div className="text-center">
             <h1 className="text-4xl font-bold tracking-tight sm:text-5xl md:text-6xl">
-              专业的量化交易策略平台
+              豆粕品种量化交易策略平台
             </h1>
             <p className="mt-3 max-w-md mx-auto text-base sm:text-lg md:mt-5 md:text-xl md:max-w-3xl">
               提供全方位的市场数据分析、技术分析和交易策略服务，助力您的投资决策。
@@ -119,9 +119,9 @@ const Home: React.FC = () => {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
                 </svg>
               </div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-2">交易策略</h3>
+              <h3 className="text-xl font-semibold text-gray-900 mb-2">品种组合</h3>
               <p className="text-gray-500">
-                提供多种量化交易策略，支持策略回测和实盘交易。
+                提供ETF、期货、期权等多种品种组合策略，支持策略回测。
               </p>
             </div>
           </div>

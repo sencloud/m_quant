@@ -1,7 +1,14 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
+import { Link, NavLink } from 'react-router-dom';
 
 const Header: React.FC = () => {
+  // 定义活动链接的类名函数
+  const getNavLinkClass = ({ isActive }: { isActive: boolean }) => {
+    return isActive 
+      ? "text-blue-600 border-b-2 border-blue-600 hover:text-blue-700 px-3 py-2 text-sm font-medium"
+      : "text-gray-700 hover:text-gray-900 px-3 py-2 text-sm font-medium";
+  };
+
   return (
     <header className="bg-white shadow-sm">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -19,18 +26,18 @@ const Header: React.FC = () => {
 
           {/* Navigation */}
           <nav className="hidden md:flex space-x-8">
-            {/* <Link to="/market" className="text-gray-700 hover:text-gray-900 px-3 py-2 text-sm font-medium">
+            {/* <NavLink to="/market" className={getNavLinkClass}>
               市场数据
-            </Link>
-            <Link to="/analysis" className="text-gray-700 hover:text-gray-900 px-3 py-2 text-sm font-medium">
+            </NavLink>
+            <NavLink to="/analysis" className={getNavLinkClass}>
               技术分析
-            </Link> */}
-            <Link to="/trading" className="text-gray-700 hover:text-gray-900 px-3 py-2 text-sm font-medium">
+            </NavLink> */}
+            <NavLink to="/trading" className={getNavLinkClass}>
               交易策略
-            </Link>
-            <Link to="/research" className="text-gray-700 hover:text-gray-900 px-3 py-2 text-sm font-medium">
+            </NavLink>
+            <NavLink to="/research" className={getNavLinkClass}>
               研究报告
-            </Link>
+            </NavLink>
           </nav>
 
           {/* Right side */}

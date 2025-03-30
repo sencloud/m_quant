@@ -47,7 +47,7 @@ class MarketDataService:
                     ts_code=symbol+'.DCE',
                     trade_date=latest_trade_date
                 )
-                logger.info(f"主力合约查询结果: \n{main_contract}")
+                logger.debug(f"主力合约查询结果: \n{main_contract}")
                 
                 if main_contract is None or main_contract.empty:
                     logger.warning(f"未找到主力合约 - 品种: {symbol}, 日期: {latest_trade_date}")
@@ -97,7 +97,7 @@ class MarketDataService:
                 return []
             
             logger.info(f"成功获取期货数据，共{len(df)}条记录")
-            logger.info(f"数据示例: \n{df.head()}")
+            logger.debug(f"数据示例: \n{df.head()}")
             
             # 处理数据
             futures_data = []

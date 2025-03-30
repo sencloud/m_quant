@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from routers import market_data, trading, fundamental
+from routers import market_data, trading, fundamental, core_factor
 from config import settings
 from utils.logger import logger
 
@@ -40,6 +40,13 @@ app.include_router(
     tags=["fundamental"]
 )
 logger.info("基本面分析路由注册完成")
+
+app.include_router(
+    core_factor.router,
+    prefix=f"{settings.API_V1_STR}/core-factor",
+    tags=["core_factor"]
+)
+logger.info("核心驱动因子分析路由注册完成")
 
 @app.on_event("startup")
 async def startup_event():

@@ -1,10 +1,12 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import Layout from './components/layout/Layout';
 import Home from './pages/Home';
 import Trading from './pages/Trading';
 import Research from './pages/Research';
+import PrivacyPolicy from './pages/PrivacyPolicy';
+import TermsOfService from './pages/TermsOfService';
+import Disclaimer from './pages/Disclaimer';
 
 const queryClient = new QueryClient();
 
@@ -16,6 +18,9 @@ const App: React.FC = () => {
           <Route path="/" element={<Home />} />
           <Route path="/trading" element={<Trading />} />
           <Route path="/research" element={<Research />} />
+          <Route path="/privacy" element={<PrivacyPolicy />} />
+          <Route path="/terms" element={<TermsOfService />} />
+          <Route path="/disclaimer" element={<Disclaimer />} />
           {/* 其他路由将在后续添加 */}
         </Routes>
       </Router>
