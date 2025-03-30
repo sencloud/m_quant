@@ -80,14 +80,14 @@ const StrategyAdvice: React.FC<StrategyAdviceProps> = ({ strategyData, isStreami
   return (
     <div className="bg-white rounded-lg overflow-hidden mb-6">
       <div className="p-4 border-b border-gray-200 bg-gray-50">
-        <h2 className="text-lg font-semibold text-gray-900">策略建议</h2>
+        <h2 className="text-lg font-semibold text-gray-900">交易策略建议</h2>
         <p className="text-sm text-gray-500 mt-1">基于市场分析的交易策略建议</p>
       </div>
 
       <div className="p-6">
         <div className="space-y-4">
           <div className="relative">
-            <div className="flex justify-between items-start mb-4">
+            {/* <div className="flex justify-between items-start mb-4">
               {!isStreaming && strategyData.reasoning_content && (
                 <button
                   onClick={() => setShowReasoning(!showReasoning)}
@@ -96,7 +96,7 @@ const StrategyAdvice: React.FC<StrategyAdviceProps> = ({ strategyData, isStreami
                   {showReasoning ? '收起思维链' : '查看思维链'}
                 </button>
               )}
-            </div>
+            </div> */}
             <div className="prose prose-sm max-w-none dark:prose-invert">
               <ReactMarkdown
                 remarkPlugins={[remarkGfm]}

@@ -202,7 +202,7 @@ const CoreFactorAnalysis: React.FC = () => {
                       <p>• 当前库存水平：{coreFactorData.inventory_cycle.current_inventory.value} {coreFactorData.inventory_cycle.current_inventory.unit}，处于{coreFactorData.inventory_cycle.current_inventory.level}。</p>
                       <p>• 库存拐点预判：{coreFactorData.inventory_cycle.forecast.turning_point}</p>
                     </div>
-                    <div className="mt-4">
+                    {/* <div className="mt-4">
                       <div className="flex justify-between items-center mb-2">
                         <span className="text-sm text-gray-500">最近库存变化</span>
                         <div className="flex items-center space-x-4">
@@ -218,7 +218,7 @@ const CoreFactorAnalysis: React.FC = () => {
                           </span>
                         </div>
                       </div>
-                    </div>
+                    </div> */}
                   </div>
                 </div>
               </div>
