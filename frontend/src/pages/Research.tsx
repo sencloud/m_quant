@@ -140,10 +140,11 @@ const Research: React.FC = () => {
             </div>
           </div>
         </div>
-
+        
+        <StrategyAdvice strategyData={strategyData} isStreaming={isStreaming} />
         <CoreFactorAnalysis />
         <OptionsStrategy selectedDate={selectedDate} fundamentalData={fundamentalData} />
-        <StrategyAdvice strategyData={strategyData} isStreaming={isStreaming} />
+        
       </div>
     </Layout>
   );
