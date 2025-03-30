@@ -12,7 +12,11 @@ interface StrategyResponse {
 }
 
 const Research: React.FC = () => {
-  const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const minDate = "2025-03-28";
+  const today = new Date().toISOString().split('T')[0];
+  const initialDate = today < minDate ? minDate : today;
+  
+  const [selectedDate, setSelectedDate] = useState<string>(initialDate);
   const [isLoading, setIsLoading] = useState(false);
   const [strategyData, setStrategyData] = useState<StrategyResponse | null>(null);
   const [isStreaming, setIsStreaming] = useState(false);
@@ -127,6 +131,8 @@ const Research: React.FC = () => {
                 className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
                 value={selectedDate}
                 onChange={(e) => setSelectedDate(e.target.value)}
+                min={minDate}
+                max={today}
               />
             </div>
             <div className="flex items-end">
