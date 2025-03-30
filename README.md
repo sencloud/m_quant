@@ -9,6 +9,13 @@
 - **核心观点**: 提供豆粕市场的核心交易观点和策略建议
 - **每日分析**: 实时更新市场动态，技术面和基本面分析
 - **AI量化模型**: 基于深度强化学习的交易策略辅助系统
+- 功能截图
+![image](https://github.com/user-attachments/assets/e2e7c614-299a-47b5-abc3-47cbcb27ae1a)
+![image](https://github.com/user-attachments/assets/5a838f54-c7e4-4bea-b73b-f6d9fa2bad8a)
+![image](https://github.com/user-attachments/assets/0ae27f63-8881-4bfd-b903-d7eebfac4ecf)
+![image](https://github.com/user-attachments/assets/213f272b-3f89-47eb-a73f-decbdcc6f20c)
+![image](https://github.com/user-attachments/assets/65212da6-9ae0-44e4-a247-c0d157d98b76)
+
 
 ## 技术架构
 
