@@ -10,13 +10,16 @@ interface SpreadAnalysis {
   zScore: number; // 当前价差的Z分数
 }
 
+type Commodity = 'M' | 'C';
+
 const ArbitrageStrategy: React.FC = () => {
   const [spreadData2509_2601, setSpreadData2509_2601] = useState<SpreadData[]>([]);
   const [spreadData2505_2509, setSpreadData2505_2509] = useState<SpreadData[]>([]);
   const [spreadData2507_2511, setSpreadData2507_2511] = useState<SpreadData[]>([]);
   const [loading, setLoading] = useState(true);
-  const [stdMultiplier, setStdMultiplier] = useState(2);
+  const [stdMultiplier, setStdMultiplier] = useState(1.3);
   const [windowSize, setWindowSize] = useState(60); // 滚动窗口大小，默认60天
+  const [commodity, setCommodity] = useState<Commodity>('M');
 
   // 计算价差统计分析
   const calculateSpreadAnalysis = (data: SpreadData[]): SpreadAnalysis => {
@@ -56,32 +59,48 @@ const ArbitrageStrategy: React.FC = () => {
   const analysis2507_2511 = useMemo(() => calculateSpreadAnalysis(spreadData2507_2511), 
     [spreadData2507_2511, stdMultiplier, windowSize]);
 
+  const fetchSpreadData = async (commodity: Commodity) => {
+    setLoading(true);
+    try {
+      // 获取2509-2601价差数据
+      const data2509_2601 = await getSpreadData(
+        undefined, 
+        undefined, 
+        `${commodity}2509.DCE`, 
+        `${commodity}2601.DCE`
+      );
+      const sortedData2509_2601 = [...data2509_2601].sort((a, b) => a.date.localeCompare(b.date));
+      setSpreadData2509_2601(sortedData2509_2601);
+      
+      // 获取2505-2509价差数据
+      const data2505_2509 = await getSpreadData(
+        undefined, 
+        undefined, 
+        `${commodity}2505.DCE`, 
+        `${commodity}2509.DCE`
+      );
+      const sortedData2505_2509 = [...data2505_2509].sort((a, b) => a.date.localeCompare(b.date));
+      setSpreadData2505_2509(sortedData2505_2509);
+
+      // 获取2507-2511价差数据
+      const data2507_2511 = await getSpreadData(
+        undefined, 
+        undefined, 
+        `${commodity}2507.DCE`, 
+        `${commodity}2511.DCE`
+      );
+      const sortedData2507_2511 = [...data2507_2511].sort((a, b) => a.date.localeCompare(b.date));
+      setSpreadData2507_2511(sortedData2507_2511);
+    } catch (error) {
+      console.error('获取价差数据失败:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        // 获取M2509-M2601价差数据
-        const data2509_2601 = await getSpreadData(undefined, undefined, 'M2509.DCE', 'M2601.DCE');
-        const sortedData2509_2601 = [...data2509_2601].sort((a, b) => a.date.localeCompare(b.date));
-        setSpreadData2509_2601(sortedData2509_2601);
-        
-        // 获取M2505-M2509价差数据
-        const data2505_2509 = await getSpreadData(undefined, undefined, 'M2505.DCE', 'M2509.DCE');
-        const sortedData2505_2509 = [...data2505_2509].sort((a, b) => a.date.localeCompare(b.date));
-        setSpreadData2505_2509(sortedData2505_2509);
-
-        // 获取M2507-M2511价差数据
-        const data2507_2511 = await getSpreadData(undefined, undefined, 'M2507.DCE', 'M2511.DCE');
-        const sortedData2507_2511 = [...data2507_2511].sort((a, b) => a.date.localeCompare(b.date));
-        setSpreadData2507_2511(sortedData2507_2511);
-      } catch (error) {
-        console.error('获取价差数据失败:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchData();
-  }, []);
+    fetchSpreadData(commodity);
+  }, [commodity]);
 
   const createChartOption = (data: SpreadData[], title: string, analysis: SpreadAnalysis) => ({
     tooltip: {
@@ -190,10 +209,18 @@ const ArbitrageStrategy: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <div className="bg-gray-50 p-4 rounded-lg">
-        <h3 className="text-lg font-medium text-gray-900">策略说明</h3>
+      <div className="prose max-w-none">
+        <div className="flex items-center justify-between">
+          <h3 className="text-lg font-medium text-gray-900">策略说明</h3>
+          <button
+            onClick={() => setCommodity(prev => prev === 'M' ? 'C' : 'M')}
+            className="px-3 py-1 text-sm font-medium text-blue-600 bg-blue-50 rounded-full hover:bg-blue-100 transition-colors"
+          >
+            对比{commodity === 'M' ? '玉米' : '豆粕'}
+          </button>
+        </div>
         <p className="text-gray-600">
-          近远月套利策略是基于同一品种不同到期月份合约之间的价差进行交易。当两个合约之间的价差出现不合理变动时，通过同时买入低估合约和卖出高估合约来获取套利收益。
+          {commodity === 'M' ? '豆粕' : '玉米'}近远月套利策略是基于同一品种不同到期月份合约之间的价差进行交易。当两个合约之间的价差出现不合理变动时，通过同时买入低估合约和卖出高估合约来获取套利收益。
         </p>
         
         <h4 className="text-md font-medium text-gray-900 mt-4">交易逻辑</h4>
@@ -245,7 +272,7 @@ const ArbitrageStrategy: React.FC = () => {
       <div className="space-y-6">
         {/* M2509-M2601单独一行 */}
         <ChartCard 
-          title="M2509-M2601价差走势" 
+          title={`${commodity}2509-${commodity}2601价差走势`} 
           data={spreadData2509_2601}
           analysis={analysis2509_2601}
         />
@@ -253,12 +280,12 @@ const ArbitrageStrategy: React.FC = () => {
         {/* M2505-M2509和M2507-M2511并列一行 */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <ChartCard 
-            title="M2505-M2509价差走势" 
+            title={`${commodity}2505-${commodity}2509价差走势`} 
             data={spreadData2505_2509}
             analysis={analysis2505_2509}
           />
           <ChartCard 
-            title="M2507-M2511价差走势" 
+            title={`${commodity}2507-${commodity}2511价差走势`} 
             data={spreadData2507_2511}
             analysis={analysis2507_2511}
           />
