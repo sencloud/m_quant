@@ -23,13 +23,13 @@ const Home: React.FC = () => {
   });
 
   // 获取库存数据
-  const { data: inventoryData, isLoading: isInventoryLoading } = useQuery<InventoryData[]>({
-    queryKey: ['inventoryData'],
-    queryFn: async () => {
-      const response = await axios.get(API_ENDPOINTS.market.inventory);
-      return response.data;
-    }
-  });
+  // const { data: inventoryData, isLoading: isInventoryLoading } = useQuery<InventoryData[]>({
+  //   queryKey: ['inventoryData'],
+  //   queryFn: async () => {
+  //     const response = await axios.get(API_ENDPOINTS.market.inventory);
+  //     return response.data;
+  //   }
+  // });
 
   // 获取技术分析数据
   const { data: technicalData, isLoading: isTechnicalLoading } = useQuery<TechnicalIndicatorsType>({
@@ -41,16 +41,16 @@ const Home: React.FC = () => {
   });
 
   // 获取期权日线数据
-  const { data: optionDaily, isLoading: isOptionDailyLoading } = useQuery<OptionDaily[]>({
-    queryKey: ['optionDaily'],
-    queryFn: async () => {
-      const response = await axios.get(API_ENDPOINTS.market.options + '/daily');
-      return response.data;
-    },
-    refetchInterval: false,
-    refetchOnWindowFocus: false,
-    staleTime: 5 * 60 * 1000
-  });
+  // const { data: optionDaily, isLoading: isOptionDailyLoading } = useQuery<OptionDaily[]>({
+  //   queryKey: ['optionDaily'],
+  //   queryFn: async () => {
+  //     const response = await axios.get(API_ENDPOINTS.market.options + '/daily');
+  //     return response.data;
+  //   },
+  //   refetchInterval: false,
+  //   refetchOnWindowFocus: false,
+  //   staleTime: 5 * 60 * 1000
+  // });
 
   // 获取期权合约基本信息
   const { data: optionBasics, isLoading: isOptionBasicsLoading } = useQuery<OptionBasic[]>({
@@ -218,7 +218,7 @@ const Home: React.FC = () => {
           )}
 
           {/* 库存图表 */}
-          {isInventoryLoading ? (
+          {/* {isInventoryLoading ? (
             <ChartSkeleton />
           ) : (
             inventoryData && (
@@ -226,10 +226,10 @@ const Home: React.FC = () => {
                 <InventoryChart data={inventoryData} />
               </div>
             )
-          )}
+          )} */}
           
           {/* 期权数据 */}
-          {isOptionBasicsLoading || isOptionDailyLoading ? (
+          {/* {isOptionBasicsLoading || isOptionDailyLoading ? (
             <Card className="mb-8">
               <Skeleton.Input active block style={{ height: 600 }} />
             </Card>
@@ -237,7 +237,7 @@ const Home: React.FC = () => {
             optionBasics && optionDaily && (
               <OptionData optionBasics={optionBasics} optionDaily={optionDaily} />
             )
-          )}
+          )} */}
         </div>
       </section>
     </Layout>

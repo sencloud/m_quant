@@ -38,7 +38,7 @@ const PriceChart: React.FC<PriceChartProps> = ({ contract }) => {
               <p>${historicalPoint.axisValue}</p>
               <p style="margin: 0">
                 <span style="display:inline-block;margin-right:4px;border-radius:10px;width:10px;height:10px;background-color:#1890ff;"></span>
-                历史当日均价: ${historicalPoint.value.toFixed(2)}元/吨
+                主力合约收盘价格: ${historicalPoint.value.toFixed(2)}元/吨
               </p>
               <p style="margin: 0">
                 <span style="display:inline-block;margin-right:4px;border-radius:10px;width:10px;height:10px;border: 2px dashed #FF4D4F;"></span>
@@ -49,7 +49,7 @@ const PriceChart: React.FC<PriceChartProps> = ({ contract }) => {
         }
       },
       legend: {
-        data: ['历史当日均价', '当前价格'],
+        data: ['主力合约收盘价格', '当前价格'],
         top: 0
       },
       grid: {
@@ -88,7 +88,7 @@ const PriceChart: React.FC<PriceChartProps> = ({ contract }) => {
       },
       series: [
         {
-          name: '历史当日均价',
+          name: '主力合约收盘价格',
           type: 'line',
           data: prices,
           smooth: true,

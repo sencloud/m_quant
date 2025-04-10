@@ -12,7 +12,7 @@ interface StrategyResponse {
 }
 
 const Research: React.FC = () => {
-  const minDate = "2025-03-28";
+  const minDate = "2025-04-10";
   const today = new Date().toISOString().split('T')[0];
   const initialDate = today < minDate ? minDate : today;
   

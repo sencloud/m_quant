@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from routers import market_data, trading, fundamental, core_factor
+from routers import market_data, trading, fundamental, core_factor, arbitrage
 from config import settings
 from utils.logger import logger
 
@@ -47,6 +47,13 @@ app.include_router(
     tags=["core_factor"]
 )
 logger.info("核心驱动因子分析路由注册完成")
+
+app.include_router(
+    arbitrage.router,
+    prefix=f"{settings.API_V1_STR}/arbitrage",
+    tags=["arbitrage"]
+)
+logger.info("套利策略路由注册完成")
 
 @app.on_event("startup")
 async def startup_event():
