@@ -52,22 +52,37 @@ class MarketDataService:
                 if trade_cal.empty:
                     logger.warning(f"未找到小于等于{end_date}的交易日")
                     return []
-                    
-                latest_trade_date = trade_cal.iloc[0]['cal_date']
-                logger.info(f"最近的交易日: {latest_trade_date}")
                 
-                # 获取主力合约
-                main_contract = self.pro.fut_mapping(
-                    ts_code=symbol+'.DCE',
-                    trade_date=latest_trade_date
-                )
-                logger.debug(f"主力合约查询结果: \n{main_contract}")
+                # 按日期降序排序，从最近的交易日开始查找
+                trade_cal = trade_cal.sort_values('cal_date', ascending=False)
+                
+                # 尝试查找最近5个交易日的主力合约
+                main_contract = None
+                latest_trade_date = None
+                
+                for _, row in trade_cal.head(5).iterrows():
+                    current_date = row['cal_date']
+                    logger.info(f"尝试获取{current_date}的主力合约")
+                    
+                    temp_main_contract = self.pro.fut_mapping(
+                        ts_code=symbol+'.DCE',
+                        trade_date=current_date
+                    )
+                    
+                    if temp_main_contract is not None and not temp_main_contract.empty:
+                        main_contract = temp_main_contract
+                        latest_trade_date = current_date
+                        logger.info(f"在{current_date}找到主力合约")
+                        break
+                    else:
+                        logger.warning(f"在{current_date}未找到主力合约")
                 
                 if main_contract is None or main_contract.empty:
-                    logger.warning(f"未找到主力合约 - 品种: {symbol}, 日期: {latest_trade_date}")
+                    logger.warning(f"在最近5个交易日未找到主力合约 - 品种: {symbol}")
                     return []
+                
                 symbol = main_contract.iloc[0]['mapping_ts_code']
-                logger.info(f"获取到主力合约: {symbol}")
+                logger.info(f"获取到主力合约: {symbol}, 日期: {latest_trade_date}")
             
             # 获取合约基本信息
             contract_info = self.pro.fut_basic(
