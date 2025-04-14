@@ -721,4 +721,181 @@ class MarketDataService:
             logger.error(f"获取期权对冲数据失败: {str(e)}")
             import traceback
             traceback.print_exc()
-            return [] 
+            return []
+
+    def get_historical_comparison_data(self, symbol: str = "M") -> List[FuturesData]:
+        """获取历史同期数据"""
+        try:
+            logger.info(f"开始获取历史同期数据 - 品种: {symbol}")
+            
+            # 处理可能的无穷大或NaN值
+            def safe_float(value):
+                try:
+                    if pd.isna(value) or np.isinf(value):
+                        return 0.0
+                    return float(value)
+                except (ValueError, TypeError):
+                    return 0.0
+            
+            # 获取当前主力合约
+            # 获取最近的交易日
+            trade_cal = self.pro.trade_cal(
+                exchange='DCE',
+                is_open='1',
+                start_date=(datetime.now() - timedelta(days=10)).strftime('%Y%m%d'),
+                end_date=datetime.now().strftime('%Y%m%d')
+            )
+            if trade_cal is None or trade_cal.empty:
+                logger.warning(f"未找到最近的交易日")
+                return []
+            
+            # 按日期降序排序，从最近的交易日开始查找
+            trade_cal = trade_cal.sort_values('cal_date', ascending=False)
+            
+            # 尝试查找最近5个交易日的主力合约
+            main_contract = None
+            latest_trade_date = None
+            
+            for _, row in trade_cal.head(5).iterrows():
+                current_date = row['cal_date']
+                logger.info(f"尝试获取{current_date}的主力合约")
+                
+                temp_main_contract = self.pro.fut_mapping(
+                    ts_code=symbol+'.DCE',
+                    trade_date=current_date
+                )
+                
+                if temp_main_contract is not None and not temp_main_contract.empty:
+                    main_contract = temp_main_contract
+                    latest_trade_date = current_date
+                    logger.info(f"在{current_date}找到主力合约")
+                    break
+                else:
+                    logger.warning(f"在{current_date}未找到主力合约")
+            
+            if main_contract is None or main_contract.empty:
+                logger.warning(f"在最近5个交易日未找到主力合约 - 品种: {symbol}")
+                return []
+            
+            current_contract = main_contract.iloc[0]['mapping_ts_code'].split('.')[0]  # 去掉.DCE后缀
+            logger.info(f"当前主力合约: {current_contract}")
+            
+            # 从合约代码中提取年份和月份部分（例如从M2509提取25和09）
+            contract_year = current_contract[-4:-2]  # 提取年份，如"25"
+            contract_month = current_contract[-2:]   # 提取月份，如"09"
+            
+            # 获取过去10年的同期合约数据
+            historical_data = []
+            current_year = int(contract_year)  # 使用当前合约的年份作为基准
+            
+            # 获取当前合约的数据作为参考
+            current_contract_info = self.pro.fut_basic(
+                ts_code=f"{current_contract}.DCE",
+                exchange='DCE'
+            )
+            
+            if current_contract_info is None or current_contract_info.empty:
+                logger.warning(f"未找到当前合约信息: {current_contract}")
+                return []
+                
+            # 计算当前合约已上市的天数
+            current_list_date = current_contract_info.iloc[0]['list_date']
+            days_listed = (datetime.strptime(latest_trade_date, '%Y%m%d') - 
+                         datetime.strptime(current_list_date, '%Y%m%d')).days
+            
+            for year in range(current_year - 10, current_year + 1):
+                # 构建历史合约代码（例如M2409、M2309等）
+                year_str = str(year)[-2:]  # 取年份的后两位
+                historical_contract = f"{symbol}{year_str}{contract_month}"
+                logger.info(f"获取历史合约数据: {historical_contract}")
+                
+                try:
+                    # 获取合约基本信息
+                    contract_info = self.pro.fut_basic(
+                        ts_code=f"{historical_contract}.DCE",
+                        exchange='DCE'
+                    )
+                    
+                    if contract_info is not None and not contract_info.empty:
+                        # 获取合约的实际交易日期范围
+                        start_date = contract_info.iloc[0]['list_date']
+                        end_date = contract_info.iloc[0]['delist_date']
+                        if not end_date:  # 如果是当前合约
+                            end_date = latest_trade_date
+                            
+                        # 计算开始日期：从退市日期往前推days_listed天
+                        if end_date:
+                            start_date = (datetime.strptime(end_date, '%Y%m%d') - 
+                                        timedelta(days=365)).strftime('%Y%m%d')
+                            
+                        logger.info(f"合约 {historical_contract} 交易期间: {start_date} - {end_date}")
+                        
+                        # 获取该合约的历史数据
+                        df = self.pro.fut_daily(
+                            ts_code=f"{historical_contract}.DCE",
+                            start_date=start_date,
+                            end_date=end_date
+                        )
+                        
+                        if df is not None and not df.empty:
+                            # 过滤掉无效数据（价格为0的数据点）
+                            df = df[df['close'] > 0]
+                            
+                            if not df.empty:
+                                # 获取最新的价格数据
+                                latest_data = df.iloc[-1]
+                                
+                                # 构建合约数据
+                                contract_data = {
+                                    'ts_code': f"{historical_contract}.DCE",
+                                    'trade_date': latest_data['trade_date'],
+                                    'pre_close': safe_float(latest_data['pre_close']),
+                                    'pre_settle': safe_float(latest_data['pre_settle']),
+                                    'open': safe_float(latest_data['open']),
+                                    'high': safe_float(latest_data['high']),
+                                    'low': safe_float(latest_data['low']),
+                                    'close': safe_float(latest_data['close']),
+                                    'settle': safe_float(latest_data['settle']),
+                                    'change1': safe_float(latest_data['change1']),
+                                    'change2': safe_float(latest_data['change2']),
+                                    'vol': safe_float(latest_data['vol']),
+                                    'amount': safe_float(latest_data['amount']),
+                                    'oi': safe_float(latest_data['oi']),
+                                    'oi_chg': safe_float(latest_data['oi_chg']),
+                                    'contract': historical_contract,
+                                    'price': safe_float(latest_data['close']),
+                                    'historicalPrices': []
+                                }
+                                
+                                # 添加历史价格数据
+                                for _, row in df.iterrows():
+                                    # 过滤日期：只保留10月到8月的数据
+                                    trade_month = int(row['trade_date'][4:6])  # 获取月份
+                                    if 1 <= trade_month <= 8 or trade_month >= 10:  # 只保留1-8月和10-12月的数据
+                                        price_data = {
+                                            'date': row['trade_date'],
+                                            'open': safe_float(row['open']),
+                                            'high': safe_float(row['high']),
+                                            'low': safe_float(row['low']),
+                                            'close': safe_float(row['close']),
+                                            'volume': safe_float(row['vol']),
+                                            'contract': historical_contract
+                                        }
+                                        contract_data['historicalPrices'].append(price_data)
+                                
+                                # 只有当有历史价格数据时才添加到结果中
+                                if contract_data['historicalPrices']:
+                                    historical_data.append(FuturesData(**contract_data))
+                    else:
+                        logger.warning(f"未找到合约信息: {historical_contract}")
+                        
+                except Exception as e:
+                    logger.error(f"获取合约 {historical_contract} 数据失败: {str(e)}")
+                    continue
+            
+            logger.info(f"成功获取历史同期数据，共{len(historical_data)}个合约")
+            return historical_data
+            
+        except Exception as e:
+            logger.error(f"获取历史同期数据失败: {str(e)}")
+            raise 

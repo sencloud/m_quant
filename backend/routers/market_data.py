@@ -105,14 +105,16 @@ async def get_inventory_data(
         
         # 转换数据格式
         inventory_list = []
-        for item in data.get("history_data", []):
+        history_data = data.get("history_data", [])
+        for i, item in enumerate(history_data):
             # 计算环比和同比变化
             current_value = item["inventory"]
-            previous_value = data.get("history_data", [])[1]["inventory"] if len(data.get("history_data", [])) > 1 else current_value
+            previous_value = history_data[i-1]["inventory"] if i > 0 else current_value
             last_year_value = data.get("history_data", [])[12]["inventory"] if len(data.get("history_data", [])) > 12 else current_value
             
-            mom_change = ((current_value - previous_value) / previous_value) * 100
-            yoy_change = ((current_value - last_year_value) / last_year_value) * 100
+            # mom_change改为直接相减
+            mom_change = current_value - previous_value
+            yoy_change = ((current_value - last_year_value) / last_year_value * 100) if last_year_value != 0 else 0
             
             inventory_list.append(InventoryData(
                 date=item["date"].strftime('%Y-%m-%d'),
@@ -212,4 +214,19 @@ async def get_option_daily_by_code(
         return result
     except Exception as e:
         logger.error(f"获取期权 {ts_code} 的日线数据失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/futures/historical", response_model=List[FuturesData])
+async def get_historical_comparison_data(
+    symbol: str = "M",
+    service: MarketDataService = Depends(get_market_data_service)
+):
+    """获取历史同期数据"""
+    logger.info(f"收到历史同期数据请求 - 品种: {symbol}")
+    try:
+        data = service.get_historical_comparison_data(symbol)
+        logger.info(f"成功返回历史同期数据，共{len(data)}条记录")
+        return data
+    except Exception as e:
+        logger.error(f"历史同期数据请求失败: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e)) 

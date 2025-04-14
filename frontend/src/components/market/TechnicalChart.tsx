@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import * as echarts from 'echarts';
-import { ContractPrice, TechnicalIndicators, KlineData } from '../../types/market';
+import { ContractPrice, TechnicalIndicators } from '../../types/market';
 
 interface TechnicalChartProps {
   technicalData: TechnicalIndicators | null;
@@ -9,9 +9,12 @@ interface TechnicalChartProps {
 
 const TechnicalChart: React.FC<TechnicalChartProps> = ({ technicalData, contract }) => {
   const chartRef = useRef<HTMLDivElement>(null);
-  
+
   useEffect(() => {
-    if (!chartRef.current || !technicalData || !contract || !contract.historicalPrices) return;
+    if (!chartRef.current || !technicalData || !contract || !contract.historicalPrices) {
+      console.log('Missing required data');
+      return;
+    }
     
     // 获取历史数据
     const historicalData = contract.historicalPrices
@@ -28,197 +31,207 @@ const TechnicalChart: React.FC<TechnicalChartProps> = ({ technicalData, contract
     const ma5 = calculateMA(5, closePrices);
     const ma10 = calculateMA(10, closePrices);
     const ma20 = calculateMA(20, closePrices);
-    const { dif, dea, bar } = calculateMACD(closePrices);
     
     // 创建ECharts实例
     const chartInstance = echarts.init(chartRef.current);
+
+    // 基础系列数据
+    const series: any[] = [
+      {
+        name: '价格',
+        type: 'candlestick',
+        data: historicalData.map(item => [
+          item.open,
+          item.close,
+          item.low,
+          item.high
+        ]),
+        itemStyle: {
+          color: '#ef5350',
+          color0: '#26a69a',
+          borderColor: '#ef5350',
+          borderColor0: '#26a69a'
+        }
+      },
+      {
+        name: 'MA5',
+        type: 'line',
+        data: ma5,
+        smooth: true,
+        symbol: 'none',
+        lineStyle: { width: 1, opacity: 0.5 }
+      },
+      {
+        name: 'MA10',
+        type: 'line',
+        data: ma10,
+        smooth: true,
+        symbol: 'none',
+        lineStyle: { width: 1, opacity: 0.5 }
+      },
+      {
+        name: 'MA20',
+        type: 'line',
+        data: ma20,
+        smooth: true,
+        symbol: 'none',
+        lineStyle: { width: 1, opacity: 0.5 }
+      }
+    ];
+
+    // 添加价格目标线
+    if (technicalData.price_targets) {
+      console.log('Adding price target lines');
+      const { support_levels, resistance_levels } = technicalData.price_targets;
+      series.push(
+        {
+          name: '支撑位S1',
+          type: 'line',
+          data: dates.map(() => support_levels.s1),
+          symbol: 'none',
+          lineStyle: { width: 2, type: 'dashed', color: '#26a69a' },
+          markPoint: {
+            symbol: 'rect',
+            symbolSize: [60, 20],
+            data: [
+              { 
+                value: support_levels.s1.toFixed(2),
+                xAxis: dates.length - 1,
+                yAxis: support_levels.s1,
+                itemStyle: { color: '#26a69a' }
+              }
+            ],
+            label: {
+              color: '#fff',
+              position: 'inside'
+            }
+          }
+        },
+        {
+          name: '支撑位S2',
+          type: 'line',
+          data: dates.map(() => support_levels.s2),
+          symbol: 'none',
+          lineStyle: { width: 1, type: 'dashed', color: '#26a69a', opacity: 0.8 },
+          markPoint: {
+            symbol: 'rect',
+            symbolSize: [60, 20],
+            data: [
+              { 
+                value: support_levels.s2.toFixed(2),
+                xAxis: dates.length - 1,
+                yAxis: support_levels.s2,
+                itemStyle: { color: '#26a69a' }
+              }
+            ],
+            label: {
+              color: '#fff',
+              position: 'inside'
+            }
+          }
+        },
+        {
+          name: '阻力位R1',
+          type: 'line',
+          data: dates.map(() => resistance_levels.r1),
+          symbol: 'none',
+          lineStyle: { width: 2, type: 'dashed', color: '#ef5350' },
+          markPoint: {
+            symbol: 'rect',
+            symbolSize: [60, 20],
+            data: [
+              { 
+                value: resistance_levels.r1.toFixed(2),
+                xAxis: dates.length - 1,
+                yAxis: resistance_levels.r1,
+                itemStyle: { color: '#ef5350' }
+              }
+            ],
+            label: {
+              color: '#fff',
+              position: 'inside'
+            }
+          }
+        },
+        {
+          name: '阻力位R2',
+          type: 'line',
+          data: dates.map(() => resistance_levels.r2),
+          symbol: 'none',
+          lineStyle: { width: 1, type: 'dashed', color: '#ef5350', opacity: 0.8 },
+          markPoint: {
+            symbol: 'rect',
+            symbolSize: [60, 20],
+            data: [
+              { 
+                value: resistance_levels.r2.toFixed(2),
+                xAxis: dates.length - 1,
+                yAxis: resistance_levels.r2,
+                itemStyle: { color: '#ef5350' }
+              }
+            ],
+            label: {
+              color: '#fff',
+              position: 'inside'
+            }
+          }
+        }
+      );
+    }
     
     // 图表配置项
     const option = {
       tooltip: {
         trigger: 'axis',
-        axisPointer: {
-          type: 'cross'
-        }
+        axisPointer: { type: 'cross' }
       },
       legend: {
-        data: ['价格', 'MA5', 'MA10', 'MA20', 'MACD', 'DIF', 'DEA'],
-        top: 0
+        data: [
+          '价格', 'MA5', 'MA10', 'MA20',
+          '支撑位S1', '支撑位S2', '阻力位R1', '阻力位R2'
+        ],
+        top: 0,
+        selected: {
+          'MA5': false,
+          'MA10': false,
+          'MA20': false
+        }
       },
-      grid: [
-        {
-          left: '3%',
-          right: '4%',
-          height: '60%',
-          top: '10%'
-        },
-        {
-          left: '3%',
-          right: '4%',
-          top: '75%',
-          height: '20%'
-        }
-      ],
-      xAxis: [
-        {
-          type: 'category',
-          data: dates,
-          scale: true,
-          boundaryGap: false,
-          axisLine: { onZero: false },
-          splitLine: { show: false },
-          splitNumber: 20,
-          gridIndex: 0
-        },
-        {
-          type: 'category',
-          gridIndex: 1,
-          data: dates,
-          axisLabel: { show: false },
-          splitLine: { show: false },
-          axisLine: { show: false },
-          splitNumber: 20
-        }
-      ],
-      yAxis: [
-        {
-          scale: true,
-          splitArea: {
-            show: true
-          },
-          gridIndex: 0
-        },
-        {
-          scale: true,
-          gridIndex: 1,
-          splitNumber: 2,
-          axisLabel: { show: false },
-          axisLine: { show: false },
-          splitLine: { show: false }
-        }
-      ],
+      grid: {
+        left: '3%',
+        right: '4%',
+        bottom: '15%',
+        containLabel: true
+      },
+      xAxis: {
+        type: 'category',
+        data: dates,
+        scale: true,
+        boundaryGap: true,
+        axisLine: { onZero: false },
+        splitLine: { show: false },
+        min: 'dataMin',
+        max: 'dataMax'
+      },
+      yAxis: {
+        scale: true,
+        splitArea: { show: true }
+      },
       dataZoom: [
         {
           type: 'inside',
-          xAxisIndex: [0, 1],
-          start: 50,
+          start: 0,
           end: 100
         },
         {
           show: true,
-          xAxisIndex: [0, 1],
           type: 'slider',
           bottom: '5%',
-          start: 50,
+          start: 0,
           end: 100
         }
       ],
-      series: [
-        {
-          name: '价格',
-          type: 'candlestick',
-          data: historicalData.map(item => [
-            item.date,
-            item.open,
-            item.close,
-            item.low,
-            item.high
-          ]),
-          itemStyle: {
-            color: '#ef5350',
-            color0: '#26a69a',
-            borderColor: '#ef5350',
-            borderColor0: '#26a69a'
-          },
-          encode: {
-            x: 0,
-            y: [1, 2, 3, 4]
-          },
-          gridIndex: 0,
-          connectNulls: true
-        },
-        {
-          name: 'MA5',
-          type: 'line',
-          data: ma5,
-          smooth: true,
-          symbol: 'none',
-          lineStyle: {
-            opacity: 0.5,
-            width: 1
-          },
-          gridIndex: 0,
-          connectNulls: true
-        },
-        {
-          name: 'MA10',
-          type: 'line',
-          data: ma10,
-          smooth: true,
-          symbol: 'none',
-          lineStyle: {
-            opacity: 0.5,
-            width: 1
-          },
-          gridIndex: 0,
-          connectNulls: true
-        },
-        {
-          name: 'MA20',
-          type: 'line',
-          data: ma20,
-          smooth: true,
-          symbol: 'none',
-          lineStyle: {
-            opacity: 0.5,
-            width: 1
-          },
-          gridIndex: 0,
-          connectNulls: true
-        },
-        {
-          name: 'MACD',
-          type: 'bar',
-          data: bar,
-          xAxisIndex: 1,
-          yAxisIndex: 1,
-          gridIndex: 1,
-          connectNulls: true,
-          itemStyle: {
-            color: function(params: any) {
-              return params.data >= 0 ? '#ef5350' : '#26a69a';
-            }
-          }
-        },
-        {
-          name: 'DIF',
-          type: 'line',
-          data: dif,
-          xAxisIndex: 1,
-          yAxisIndex: 1,
-          gridIndex: 1,
-          symbol: 'none',
-          lineStyle: {
-            width: 1,
-            opacity: 0.8
-          },
-          connectNulls: true
-        },
-        {
-          name: 'DEA',
-          type: 'line',
-          data: dea,
-          xAxisIndex: 1,
-          yAxisIndex: 1,
-          gridIndex: 1,
-          symbol: 'none',
-          lineStyle: {
-            width: 1,
-            opacity: 0.8
-          },
-          connectNulls: true
-        }
-      ]
+      series
     };
     
     // 渲染图表
@@ -258,55 +271,6 @@ function calculateMA(dayCount: number, data: number[]) {
     }
     result.push(Number((sum / dayCount).toFixed(2)));
   }
-  return result;
-}
-
-// 计算MACD
-function calculateMACD(data: number[]) {
-  const dif = calculateDIF(data);
-  const dea = calculateDEA(dif);
-  const bar = dif.map((value, index) => {
-    const difValue = typeof value === 'string' ? 0 : value;
-    const deaValue = typeof dea[index] === 'string' ? 0 : dea[index];
-    return Number((difValue - deaValue) * 2).toFixed(2);
-  });
-  return { dif, dea, bar };
-}
-
-// 计算DIF
-function calculateDIF(data: number[]) {
-  const ema12 = calculateEMA(12, data);
-  const ema26 = calculateEMA(26, data);
-  return ema12.map((value, index) => {
-    const ema12Value = typeof value === 'string' ? 0 : value;
-    const ema26Value = typeof ema26[index] === 'string' ? 0 : ema26[index];
-    return Number((ema12Value - ema26Value).toFixed(2));
-  });
-}
-
-// 计算DEA
-function calculateDEA(data: number[]) {
-  return calculateEMA(9, data);
-}
-
-// 计算EMA
-function calculateEMA(dayCount: number, data: number[]) {
-  const result: number[] = [];
-  const k = 2 / (dayCount + 1);
-  
-  for (let i = 0, len = data.length; i < len; i++) {
-    if (i < dayCount - 1) {
-      result.push(0);  // 使用0替代'-'
-      continue;
-    }
-    
-    let ema = data[i];
-    for (let j = 1; j < dayCount; j++) {
-      ema = data[i - j] * k + ema * (1 - k);
-    }
-    result.push(Number(ema.toFixed(2)));
-  }
-  
   return result;
 }
 

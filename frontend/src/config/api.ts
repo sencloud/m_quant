@@ -13,7 +13,8 @@ export const API_ENDPOINTS = {
     futuresContracts: `${API_BASE_URL}/market/futures/contracts`,
     futuresInventory: `${API_BASE_URL}/market/futures/inventory`,
     inventory: `${API_BASE_URL}/market/inventory`,
-    technical: `${API_BASE_URL}/market/technical`
+    technical: `${API_BASE_URL}/market/technical`,
+    historical: `${API_BASE_URL}/market/futures/historical`
   },
   analysis: {
     fundamental: `${API_BASE_URL}/fundamental/analysis`,

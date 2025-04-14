@@ -13,7 +13,7 @@ const Trading: React.FC = () => {
             交易策略
           </h1>
           <p className="mt-3 max-w-2xl mx-auto text-xl text-gray-500 sm:mt-4">
-            探索专业的豆粕交易策略，包括ETF金叉策略、期货期权对冲策略和近远月套利策略
+            探索专业的豆粕交易策略，包括ETF金叉策略、近远月套利策略等
           </p>
         </div>
 

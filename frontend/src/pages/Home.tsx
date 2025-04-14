@@ -9,6 +9,7 @@ import TechnicalChart from '../components/market/TechnicalChart';
 import TechnicalIndicators from '../components/market/TechnicalIndicators';
 import InventoryChart from '../components/market/InventoryChart';
 import OptionData from '../components/market/OptionData';
+import HistoricalComparison from '../components/market/HistoricalComparison';
 import { ContractPrice, TechnicalIndicators as TechnicalIndicatorsType, InventoryData, OptionBasic, OptionDaily } from '../types/market';
 import { Skeleton, Card } from 'antd';
 
@@ -19,17 +20,19 @@ const Home: React.FC = () => {
     queryFn: async () => {
       const response = await axios.get(API_ENDPOINTS.market.futures);
       return response.data;
-    }
+    },
+    refetchOnWindowFocus: false
   });
 
   // 获取库存数据
-  // const { data: inventoryData, isLoading: isInventoryLoading } = useQuery<InventoryData[]>({
-  //   queryKey: ['inventoryData'],
-  //   queryFn: async () => {
-  //     const response = await axios.get(API_ENDPOINTS.market.inventory);
-  //     return response.data;
-  //   }
-  // });
+  const { data: inventoryData, isLoading: isInventoryLoading } = useQuery<InventoryData[]>({
+    queryKey: ['inventoryData'],
+    queryFn: async () => {
+      const response = await axios.get(API_ENDPOINTS.market.inventory);
+      return response.data;
+    },
+    refetchOnWindowFocus: false
+  });
 
   // 获取技术分析数据
   const { data: technicalData, isLoading: isTechnicalLoading } = useQuery<TechnicalIndicatorsType>({
@@ -37,7 +40,18 @@ const Home: React.FC = () => {
     queryFn: async () => {
       const response = await axios.get(API_ENDPOINTS.market.technical);
       return response.data;
-    }
+    },
+    refetchOnWindowFocus: false
+  });
+
+  // 获取历史同期数据
+  const { data: historicalData, isLoading: isHistoricalLoading } = useQuery<ContractPrice[]>({
+    queryKey: ['historicalData'],
+    queryFn: async () => {
+      const response = await axios.get(API_ENDPOINTS.market.historical);
+      return response.data;
+    },
+    refetchOnWindowFocus: false
   });
 
   // 获取期权日线数据
@@ -53,16 +67,16 @@ const Home: React.FC = () => {
   // });
 
   // 获取期权合约基本信息
-  const { data: optionBasics, isLoading: isOptionBasicsLoading } = useQuery<OptionBasic[]>({
-    queryKey: ['optionBasics'],
-    queryFn: async () => {
-      const response = await axios.get(API_ENDPOINTS.market.options + '/basic');
-      return response.data;
-    },
-    refetchInterval: false,
-    refetchOnWindowFocus: false,
-    staleTime: 5 * 60 * 1000
-  });
+  // const { data: optionBasics, isLoading: isOptionBasicsLoading } = useQuery<OptionBasic[]>({
+  //   queryKey: ['optionBasics'],
+  //   queryFn: async () => {
+  //     const response = await axios.get(API_ENDPOINTS.market.options + '/basic');
+  //     return response.data;
+  //   },
+  //   refetchInterval: false,
+  //   refetchOnWindowFocus: false,
+  //   staleTime: 5 * 60 * 1000
+  // });
 
   // 获取默认合约（豆粕）
   const defaultContract = futuresData?.[0]?.historicalPrices ? futuresData[0] : null;
@@ -193,6 +207,20 @@ const Home: React.FC = () => {
             )
           )}
 
+          {/* 历史走势比对 */}
+          {isFuturesLoading || isHistoricalLoading ? (
+            <ChartSkeleton />
+          ) : (
+            defaultContract && historicalData && (
+              <div className="mb-8">
+                <HistoricalComparison 
+                  currentContract={defaultContract}
+                  historicalContracts={historicalData}
+                />
+              </div>
+            )
+          )}
+
           {/* 技术分析图表 */}
           {isFuturesLoading || isTechnicalLoading ? (
             <ChartSkeleton />
@@ -218,7 +246,7 @@ const Home: React.FC = () => {
           )}
 
           {/* 库存图表 */}
-          {/* {isInventoryLoading ? (
+          {isInventoryLoading ? (
             <ChartSkeleton />
           ) : (
             inventoryData && (
@@ -226,7 +254,9 @@ const Home: React.FC = () => {
                 <InventoryChart data={inventoryData} />
               </div>
             )
-          )} */}
+          )}
+
+          
           
           {/* 期权数据 */}
           {/* {isOptionBasicsLoading || isOptionDailyLoading ? (
