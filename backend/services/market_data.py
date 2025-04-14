@@ -23,6 +23,8 @@ class MarketDataService:
                 logger.debug("Tushare API初始化完成")
         except Exception as e:
             logger.error(f"市场数据服务初始化失败: {str(e)}")
+            import traceback
+            traceback.print_exc()
             self.pro = None
             self.logger = logger
 

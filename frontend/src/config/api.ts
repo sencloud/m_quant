@@ -30,5 +30,10 @@ export const API_ENDPOINTS = {
   },
   trading: {
     options: `${API_BASE_URL}/trading/options`
+  },
+  trendFollow: {
+    data15min: `${API_BASE_URL}/trend_follow/15min`,
+    data60min: `${API_BASE_URL}/trend_follow/60min`,
+    backtest: `${API_BASE_URL}/trend_follow/backtest`
   }
 }; 

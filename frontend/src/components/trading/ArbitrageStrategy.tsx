@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import ReactECharts from 'echarts-for-react';
 import { getSpreadData, SpreadData } from '../../api/arbitrage';
+import { Highlight, themes, type Token } from 'prism-react-renderer';
 
 interface SpreadAnalysis {
   upperLimit: number;
@@ -20,6 +21,7 @@ const ArbitrageStrategy: React.FC = () => {
   const [stdMultiplier, setStdMultiplier] = useState(1.3);
   const [windowSize, setWindowSize] = useState(60); // 滚动窗口大小，默认60天
   const [commodity, setCommodity] = useState<Commodity>('M');
+  const [showCode, setShowCode] = useState(false);
 
   // 计算价差统计分析
   const calculateSpreadAnalysis = (data: SpreadData[]): SpreadAnalysis => {
@@ -207,17 +209,136 @@ const ArbitrageStrategy: React.FC = () => {
     </div>
   );
 
+  const pythonCode = `'''backtest
+start: 2025-01-01 09:00:00
+end: 2025-04-09 15:00:00
+period: 1m
+basePeriod: 1m
+exchanges: [{"eid":"Futures_CTP","currency":"FUTURES"}]
+mode: 1
+'''
+from datetime import datetime, time
+
+p = ext.NewPositionManager()
+
+def is_trading_time(current_time):
+    # 交易时段设置
+    trading_sessions = [
+        (time(9, 0), time(10, 15)),
+        (time(10, 30), time(11, 30)),
+        (time(13, 30), time(15, 0)),
+        (time(21, 0), time(23, 0)),
+    ]
+    for session_start, session_end in trading_sessions:
+        if session_start < current_time < session_end:
+            return True
+    return False
+
+def onTick():
+    global maxDiff, minDiff
+    # 获取合约A行情数据
+    infoA = exchange.SetContractType(symbolA)
+    tickA = exchange.GetTicker()
+    recordsA = exchange.GetRecords()
+    
+    # 获取合约B行情数据
+    infoB = exchange.SetContractType(symbolB)
+    tickB = exchange.GetTicker()
+    recordsB = exchange.GetRecords()
+    
+    if not tickA or not tickB or not recordsA or not recordsB:
+        return
+    
+    timestamp_msA = int(tickA['Time'])
+    record_datetimeA = datetime.fromtimestamp(timestamp_msA / 1000)
+    current_timeA = record_datetimeA.time()
+    timestamp_msB = int(tickB['Time'])
+    record_datetimeB = datetime.fromtimestamp(timestamp_msB / 1000)
+    current_timeB = record_datetimeB.time()
+    # 判断是否在交易时段内
+    if not is_trading_time(current_timeA) or not is_trading_time(current_timeB):
+        return
+    
+    # 分析持仓
+    pos = exchange.GetPosition()
+    if pos is None:
+        return 
+    longPosOfSymbolA = p.GetPosition(symbolA, PD_LONG)
+    shortPosOfSymbolA = p.GetPosition(symbolA, PD_SHORT)
+    longPosOfSymbolB = p.GetPosition(symbolB, PD_LONG)
+    shortPosOfSymbolB = p.GetPosition(symbolB, PD_SHORT)
+    
+    # 计算价差
+    diff = tickA["Last"] - tickB["Last"]
+    
+    if not longPosOfSymbolA and not shortPosOfSymbolA and not longPosOfSymbolB and not shortPosOfSymbolB:
+        if diff > maxDiff:
+            # 空A合约，多B合约
+            Log("空A合约:", symbolA, "，多B合约:", symbolB, ", diff:", diff, ", maxDiff:", maxDiff, "#FF0000")
+            p.OpenShort(symbolA, 2)
+            p.OpenLong(symbolB, 2)
+        elif diff < minDiff:
+            # 多A合约，空B合约
+            Log("多A合约:", symbolA, "，空B合约:", symbolB, ", diff:", diff, ", minDiff:", minDiff, "#FF0000")
+            p.OpenLong(symbolA, 2)
+            p.OpenShort(symbolB, 2)
+    
+    if longPosOfSymbolA and shortPosOfSymbolB and not shortPosOfSymbolA and not longPosOfSymbolB:
+        # 持有A多头、B空头
+        if diff > (longPosOfSymbolA["Price"] - shortPosOfSymbolB["Price"]) + stopProfit:
+            # 止盈
+            Log("持有A多头、B空头，止盈。", "diff:", diff, "持有差价：", (longPosOfSymbolA["Price"] - shortPosOfSymbolB["Price"]))
+            p.Cover(symbolA)
+            p.Cover(symbolB)
+        elif diff < (longPosOfSymbolA["Price"] - shortPosOfSymbolB["Price"]) - stopLoss:
+            # 止损
+            Log("持有A多头、B空头，止损。", "diff:", diff, "持有差价：", (longPosOfSymbolA["Price"] - shortPosOfSymbolB["Price"]))
+            p.Cover(symbolA)
+            p.Cover(symbolB)
+    elif shortPosOfSymbolA and longPosOfSymbolB and not longPosOfSymbolA and not shortPosOfSymbolB:
+        # 持有A空头、B多头
+        if diff < (shortPosOfSymbolA["Price"] - longPosOfSymbolB["Price"]) - stopProfit:
+            # 止盈
+            Log("持有A空头、B多头，止盈。", "diff:", diff, "持有差价：", (shortPosOfSymbolA["Price"] - longPosOfSymbolB["Price"]))
+            p.Cover(symbolA)
+            p.Cover(symbolB)
+        elif diff > (shortPosOfSymbolA["Price"] - longPosOfSymbolB["Price"]) + stopLoss:
+            # 止损
+            Log("持有A空头、B多头，止损。", "diff:", diff, "持有差价：", (shortPosOfSymbolA["Price"] - longPosOfSymbolB["Price"]))
+            p.Cover(symbolA)
+            p.Cover(symbolB)
+    
+    # 画图
+    ext.PlotLine("差价", diff)
+
+def main():
+    while True:
+        if exchange.IO("status"):
+            onTick()
+            LogStatus(_D(), "已连接")
+        else:
+            LogStatus(_D(), "未连接")
+        Sleep(500)`;
+
   return (
     <div className="space-y-6">
       <div className="prose max-w-none">
         <div className="flex items-center justify-between">
           <h3 className="text-lg font-medium text-gray-900">策略说明</h3>
-          <button
-            onClick={() => setCommodity(prev => prev === 'M' ? 'C' : 'M')}
-            className="px-3 py-1 text-sm font-medium text-blue-600 bg-blue-50 rounded-full hover:bg-blue-100 transition-colors"
-          >
-            对比{commodity === 'M' ? '玉米' : '豆粕'}
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setCommodity(prev => prev === 'M' ? 'C' : 'M')}
+              className="px-3 py-1 text-sm font-medium text-blue-600 bg-blue-50 rounded-full hover:bg-blue-100 transition-colors"
+            >
+              对比{commodity === 'M' ? '玉米' : '豆粕'}
+            </button>
+            <button
+              onClick={() => setShowCode(true)}
+              className="px-3 py-1 text-sm font-medium text-green-600 bg-green-50 rounded-full hover:bg-green-100 transition-colors"
+            >
+              查看代码
+            </button>
+          </div>
         </div>
         <p className="text-gray-600">
           {commodity === 'M' ? '豆粕' : '玉米'}近远月套利策略是基于同一品种不同到期月份合约之间的价差进行交易。当两个合约之间的价差出现不合理变动时，通过同时买入低估合约和卖出高估合约来获取套利收益。
@@ -291,6 +412,60 @@ const ArbitrageStrategy: React.FC = () => {
           />
         </div>
       </div>
+
+      {/* Modal */}
+      {showCode && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-3/4 max-h-[80vh] overflow-auto">
+            <div className="flex justify-between items-center mb-4">
+              <div>
+                <h3 className="text-lg font-medium">策略代码</h3>
+                <p className="text-sm text-gray-500 mt-1">本策略适用于YouQuant量化平台</p>
+              </div>
+              <button
+                onClick={() => setShowCode(false)}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="bg-[#011627] rounded-lg overflow-hidden">
+              <Highlight 
+                theme={themes.nightOwl} 
+                code={pythonCode} 
+                language="python"
+              >
+                {({
+                  className,
+                  style,
+                  tokens,
+                  getLineProps,
+                  getTokenProps
+                }: {
+                  className: string;
+                  style: React.CSSProperties;
+                  tokens: Token[][];
+                  getLineProps: (props: { line: Token[]; key: number }) => { className: string };
+                  getTokenProps: (props: { token: Token; key: number }) => { className: string };
+                }) => (
+                  <pre className={`${className} p-4 overflow-auto`} style={style}>
+                    {tokens.map((line, lineIndex) => (
+                      <div key={lineIndex} {...getLineProps({ line, key: lineIndex })}>
+                        <span className="text-gray-500 select-none mr-4 text-right inline-block w-8">
+                          {lineIndex + 1}
+                        </span>
+                        {line.map((token, tokenIndex) => (
+                          <span key={tokenIndex} {...getTokenProps({ token, key: tokenIndex })} />
+                        ))}
+                      </div>
+                    ))}
+                  </pre>
+                )}
+              </Highlight>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

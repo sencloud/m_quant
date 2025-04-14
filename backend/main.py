@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from routers import market_data, trading, fundamental, core_factor, arbitrage
+from routers import market_data, trading, fundamental, core_factor, arbitrage, trend_follow
 from config import settings
 from utils.logger import logger
 
@@ -54,6 +54,13 @@ app.include_router(
     tags=["arbitrage"]
 )
 logger.info("套利策略路由注册完成")
+
+app.include_router(
+    trend_follow.router,
+    prefix=f"{settings.API_V1_STR}/trend_follow",
+    tags=["trend_follow"]
+)
+logger.info("趋势跟随策略路由注册完成")
 
 @app.on_event("startup")
 async def startup_event():
