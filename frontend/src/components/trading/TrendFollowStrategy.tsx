@@ -556,6 +556,28 @@ const TrendFollowStrategy: React.FC = () => {
         </p>
       </div>
 
+      {/* 保持现有的图表组件不变 */}
+      <div className="bg-white p-4 rounded-lg shadow">
+        <ReactECharts 
+          option={get15minOption(data15min, backtestResult?.trades || [])} 
+          style={{ height: '400px' }}
+          onChartReady={(chart) => handleChartReady(chart, '15min')}
+          onEvents={{
+            datazoom: handleDataZoomChange('15min')
+          }}
+        />
+      </div>
+      <div className="bg-white p-4 rounded-lg shadow">
+        <ReactECharts 
+          option={get60minOption(data60min)} 
+          style={{ height: '400px' }}
+          onChartReady={(chart) => handleChartReady(chart, '60min')}
+          onEvents={{
+            datazoom: handleDataZoomChange('60min')
+          }}
+        />
+      </div>
+
       {/* 回测结果展示 */}
       {backtestResult && (
         <div className="bg-white p-6 rounded-lg shadow">
@@ -710,28 +732,6 @@ const TrendFollowStrategy: React.FC = () => {
           </div>
         </div>
       )}
-
-      {/* 保持现有的图表组件不变 */}
-      <div className="bg-white p-4 rounded-lg shadow">
-        <ReactECharts 
-          option={get15minOption(data15min, backtestResult?.trades || [])} 
-          style={{ height: '400px' }}
-          onChartReady={(chart) => handleChartReady(chart, '15min')}
-          onEvents={{
-            datazoom: handleDataZoomChange('15min')
-          }}
-        />
-      </div>
-      <div className="bg-white p-4 rounded-lg shadow">
-        <ReactECharts 
-          option={get60minOption(data60min)} 
-          style={{ height: '400px' }}
-          onChartReady={(chart) => handleChartReady(chart, '60min')}
-          onEvents={{
-            datazoom: handleDataZoomChange('60min')
-          }}
-        />
-      </div>
     </div>
   );
 };

@@ -23,10 +23,44 @@ class TrendFollowStrategy:
         df_60min['above_ema60'] = df_60min['close'] > df_60min['ema60']
         df_60min['prev_above_ema60'] = df_60min['above_ema60'].shift(1)
         df_60min['trend'] = 0
-        # 多头趋势：当前和前一根K线都在EMA60上方
-        df_60min.loc[(df_60min['above_ema60'] == True) & (df_60min['prev_above_ema60'] == True), 'trend'] = 1
-        # 空头趋势：当前和前一根K线都在EMA60下方
-        df_60min.loc[(df_60min['above_ema60'] == False) & (df_60min['prev_above_ema60'] == False), 'trend'] = -1
+
+        # 计算EMA60斜率和斜率变化
+        df_60min['ema60_slope'] = df_60min['ema60'].diff()
+        df_60min['ema60_slope_ma'] = df_60min['ema60_slope'].rolling(8).mean()
+        df_60min['ema60_slope_std'] = df_60min['ema60_slope'].rolling(8).std()
+
+        # 计算EMA穿越次数
+        df_60min['cross_count'] = ((df_60min['above_ema60'] != df_60min['prev_above_ema60'])).rolling(12).sum()
+
+        # 计算60分钟K线颜色
+        df_60min['is_red'] = df_60min['close'] > df_60min['open']
+        df_60min['is_green'] = df_60min['close'] < df_60min['open']
+        
+        # 计算过去4根K线中红柱和绿柱的数量
+        df_60min['red_count'] = df_60min['is_red'].rolling(4).sum()
+        df_60min['green_count'] = df_60min['is_green'].rolling(4).sum()
+
+        # 识别震荡市场 - 调整判断条件
+        is_oscillating = (
+            (abs(df_60min['ema60_slope_ma']) < df_60min['ema60_slope_std']) |  # EMA60斜率小于其标准差
+            (df_60min['cross_count'] >= 3) |  # 12根K线内穿越EMA60至少3次
+            (abs(df_60min['close'] - df_60min['ema60']) < df_60min['ema60'] * 0.008)  # 价格在EMA60附近震荡
+        )
+
+        # 先判断趋势方向
+        df_60min['trend'] = 0
+        # 多头趋势：当前和前一根K线都在EMA60上方，或者过去4根K线中有3根以上是红柱
+        df_60min.loc[(df_60min['above_ema60'] == True) & (df_60min['prev_above_ema60'] == True) |
+                    (df_60min['red_count'] >= 3), 'trend'] = 1
+        
+        # 空头趋势：当前和前一根K线都在EMA60下方，或者过去4根K线中有3根以上是绿柱
+        df_60min.loc[(df_60min['above_ema60'] == False) & (df_60min['prev_above_ema60'] == False) |
+                    (df_60min['green_count'] >= 3), 'trend'] = -1
+
+        # 最后处理震荡，覆盖之前的趋势判断
+        df_60min.loc[is_oscillating, 'trend'] = 0
+
+        logger.info(f"60分钟数据趋势计算完成: {df_60min.to_string()}")
         
         # 使用talib计算15分钟EMA
         df_15min['ema12'] = talib.EMA(df_15min['close'], timeperiod=12)
@@ -39,20 +73,39 @@ class TrendFollowStrategy:
         # 将60分钟趋势信息合并到15分钟数据中
         df_15min['trend'] = df_60min['trend'].reindex(df_15min.index, method='ffill')
         
+        # 计算15分钟数据的震荡指标
+        df_15min['ema_diff'] = df_15min['ema12'] - df_15min['ema26']
+        df_15min['ema_diff_slope'] = df_15min['ema_diff'].diff()
+        df_15min['ema_diff_ma'] = df_15min['ema_diff'].rolling(12).mean()
+        df_15min['ema_diff_std'] = df_15min['ema_diff'].rolling(12).std()
+        
+        # 计算15分钟EMA穿越次数
+        df_15min['is_above_ema26'] = df_15min['ema12'] > df_15min['ema26']
+        df_15min['cross_count_15min'] = ((df_15min['is_above_ema26'] != df_15min['is_above_ema26'].shift(1))).rolling(16).sum()
+        
+        # 识别15分钟震荡市场
+        is_15min_oscillating = (
+            (abs(df_15min['ema_diff']) < df_15min['ema_diff_std']) |  # EMA差值小于其标准差
+            (df_15min['cross_count_15min'] >= 4) |  # 16根K线内穿越至少4次
+            (abs(df_15min['ema_diff']) < abs(df_15min['ema_diff_ma']) * 0.8)  # EMA差值在均值附近震荡
+        )
+        
         # 生成交易信号
         df_15min['trade_signal'] = 0
         
-        # 多头条件：60分钟在EMA60上方，且15分钟EMA12和EMA26都向上
+        # 多头条件：60分钟趋势向上，15分钟不在震荡，且15分钟EMA12和EMA26都向上
         long_condition = (
             (df_15min['trend'] == 1) & 
+            (~is_15min_oscillating) &  # 不在震荡中
             (df_15min['ema12'] > df_15min['ema26']) &
             (df_15min['ema12_slope'] > 0) &
             (df_15min['ema26_slope'] > 0)
         )
         
-        # 空头条件：60分钟在EMA60下方，且15分钟EMA12和EMA26都向下
+        # 空头条件：60分钟趋势向下，15分钟不在震荡，且15分钟EMA12和EMA26都向下
         short_condition = (
             (df_15min['trend'] == -1) & 
+            (~is_15min_oscillating) &  # 不在震荡中
             (df_15min['ema12'] < df_15min['ema26']) &
             (df_15min['ema12_slope'] < 0) &
             (df_15min['ema26_slope'] < 0)
@@ -74,8 +127,8 @@ class TrendFollowStrategy:
         """执行回测"""
         logger.info("开始执行回测")
         
-        TAKE_PROFIT_MULTIPLE = 3.6  # ATR止盈倍数
-        STOP_LOSS_MULTIPLE = 1.8    # ATR止损倍数
+        TAKE_PROFIT_MULTIPLE = 3.2  # ATR止盈倍数
+        STOP_LOSS_MULTIPLE = 1.6    # ATR止损倍数
         
         trades: List[Dict] = []
         position = 0

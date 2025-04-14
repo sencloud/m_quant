@@ -62,7 +62,8 @@ const ETFStrategy: React.FC = () => {
         params: { start_date, end_date }
       });
       return response.data;
-    }
+    },
+    refetchOnWindowFocus: false
   });
 
   const getChartOption = () => {
