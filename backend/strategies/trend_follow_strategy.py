@@ -16,8 +16,9 @@ class TrendFollowStrategy:
         df_15min = df_15min.set_index('date')
         df_60min = df_60min.set_index('date')
         
-        # 使用talib计算ATR
+        # 使用talib计算ATR和ADX
         df_15min['atr'] = talib.ATR(df_15min['high'], df_15min['low'], df_15min['close'], timeperiod=70)
+        df_15min['adx'] = talib.ADX(df_15min['high'], df_15min['low'], df_15min['close'], timeperiod=14)
         
         # 在60分钟数据中计算趋势方向
         df_60min['above_ema60'] = df_60min['close'] > df_60min['ema60']
@@ -59,8 +60,6 @@ class TrendFollowStrategy:
 
         # 最后处理震荡，覆盖之前的趋势判断
         df_60min.loc[is_oscillating, 'trend'] = 0
-
-        logger.info(f"60分钟数据趋势计算完成: {df_60min.to_string()}")
         
         # 使用talib计算15分钟EMA
         df_15min['ema12'] = talib.EMA(df_15min['close'], timeperiod=12)
@@ -127,8 +126,9 @@ class TrendFollowStrategy:
         """执行回测"""
         logger.info("开始执行回测")
         
-        TAKE_PROFIT_MULTIPLE = 3.2  # ATR止盈倍数
-        STOP_LOSS_MULTIPLE = 1.6    # ATR止损倍数
+        TAKE_PROFIT_MULTIPLE = 1.5  # 初始ATR止盈倍数
+        STOP_LOSS_MULTIPLE = 1.5    # ATR止损倍数
+        ADX_THRESHOLD = 20          # ADX强趋势阈值
         
         trades: List[Dict] = []
         position = 0
@@ -141,6 +141,8 @@ class TrendFollowStrategy:
         
         last_trend = 0  # 记录上次交易的趋势
         trend_trade_count = 0  # 当前趋势下的交易次数
+        current_take_profit_multiple = TAKE_PROFIT_MULTIPLE  # 当前止盈倍数
+        take_profit_level = 0  # 记录当前止盈等级
         
         for date, row in df_15min.iterrows():
             # 检查趋势是否改变
@@ -159,17 +161,49 @@ class TrendFollowStrategy:
                     entry_atr = row['atr']
                     last_trend = row['trend']  # 记录开仓时的趋势
                     trend_trade_count += 1  # 增加当前趋势下的交易次数
+                    current_take_profit_multiple = TAKE_PROFIT_MULTIPLE  # 重置止盈倍数
+                    take_profit_level = 0  # 重置止盈等级
                 
             else:  # 有持仓
-                # 计算止盈止损价位
                 if position == 1:
-                    take_profit = entry_price + (entry_atr * TAKE_PROFIT_MULTIPLE)
+                    # 计算当前止盈价位
+                    take_profit = entry_price + (entry_atr * current_take_profit_multiple)
                     stop_loss = entry_price - (entry_atr * STOP_LOSS_MULTIPLE)
-                    # 检查是否触及止盈止损
-                    if row['high'] >= take_profit or row['low'] <= stop_loss or row['trade_signal'] == -1:
-                        exit_price = round(take_profit) if row['high'] >= take_profit else (
-                            round(stop_loss) if row['low'] <= stop_loss else round(row['close'])
-                        )
+                    
+                    # 如果价格达到当前止盈位且ADX显示强趋势，调整止盈倍数
+                    if row['high'] >= take_profit:
+                        logger.info(f"开仓时间：{entry_date.strftime('%Y-%m-%d %H:%M')}, ADX: {row['adx']}, take_profit_level: {take_profit_level}")
+                        if row['adx'] > ADX_THRESHOLD and take_profit_level < 3:
+                            # 渐进式调整止盈倍数
+                            take_profit_level += 1
+                            current_take_profit_multiple = 1.5 + (take_profit_level * 2.5)  # 1.5 -> 2.0 -> 2.5 -> 3.0
+                            # 更新止盈价位
+                            take_profit = entry_price + (entry_atr * current_take_profit_multiple)
+                        else:
+                            # 如果ADX不够强或已达最大倍数，执行止盈
+                            exit_price = round(take_profit)
+                            pnl = position * (exit_price - entry_price)
+                            total_pnl += pnl
+                            returns.append(pnl / entry_price)
+                            
+                            trades.append({
+                                'entry_date': entry_date.strftime('%Y-%m-%d %H:%M'),
+                                'entry_price': float(entry_price),
+                                'exit_date': date.strftime('%Y-%m-%d %H:%M'),
+                                'exit_price': float(exit_price),
+                                'position': 'long',
+                                'pnl': float(pnl) * 10,  # 每手10吨
+                                'exit_type': 'take_profit',
+                                'take_profit_multiple': current_take_profit_multiple
+                            })
+                            
+                            position = 0  # 平仓
+                            last_trend = row['trend']
+                            continue
+                    
+                    # 检查是否触及止损或反向信号
+                    if row['low'] <= stop_loss or row['trade_signal'] == -1:
+                        exit_price = round(stop_loss) if row['low'] <= stop_loss else round(row['close'])
                         pnl = position * (exit_price - entry_price)
                         total_pnl += pnl
                         returns.append(pnl / entry_price)
@@ -180,23 +214,52 @@ class TrendFollowStrategy:
                             'exit_date': date.strftime('%Y-%m-%d %H:%M'),
                             'exit_price': float(exit_price),
                             'position': 'long',
-                            'pnl': float(pnl) * 10,  # 每手10吨
-                            'exit_type': 'take_profit' if row['high'] >= take_profit else (
-                                'stop_loss' if row['low'] <= stop_loss else 'signal'
-                            )
+                            'pnl': float(pnl) * 10,
+                            'exit_type': 'stop_loss' if row['low'] <= stop_loss else 'signal',
+                            'take_profit_multiple': current_take_profit_multiple
                         })
                         
-                        position = 0  # 平仓
+                        position = 0
                         last_trend = row['trend']
                         
                 else:  # position == -1
-                    take_profit = entry_price - (entry_atr * TAKE_PROFIT_MULTIPLE)
+                    # 计算当前止盈价位
+                    take_profit = entry_price - (entry_atr * current_take_profit_multiple)
                     stop_loss = entry_price + (entry_atr * STOP_LOSS_MULTIPLE)
-                    # 检查是否触及止盈止损
-                    if row['low'] <= take_profit or row['high'] >= stop_loss or row['trade_signal'] == 1:
-                        exit_price = round(take_profit) if row['low'] <= take_profit else (
-                            round(stop_loss) if row['high'] >= stop_loss else round(row['close'])
-                        )
+                    
+                    # 如果价格达到当前止盈位且ADX显示强趋势，调整止盈倍数
+                    if row['low'] <= take_profit:
+                        if row['adx'] > ADX_THRESHOLD and take_profit_level < 3:
+                            # 渐进式调整止盈倍数
+                            take_profit_level += 1
+                            current_take_profit_multiple = 1.5 + (take_profit_level * 0.5)  # 1.5 -> 2.0 -> 2.5 -> 3.0
+                            # 更新止盈价位
+                            take_profit = entry_price - (entry_atr * current_take_profit_multiple)
+                        else:
+                            # 如果ADX不够强或已达最大倍数，执行止盈
+                            exit_price = round(take_profit)
+                            pnl = position * (exit_price - entry_price)
+                            total_pnl += pnl
+                            returns.append(pnl / entry_price)
+                            
+                            trades.append({
+                                'entry_date': entry_date.strftime('%Y-%m-%d %H:%M'),
+                                'entry_price': float(entry_price),
+                                'exit_date': date.strftime('%Y-%m-%d %H:%M'),
+                                'exit_price': float(exit_price),
+                                'position': 'short',
+                                'pnl': float(pnl) * 10,
+                                'exit_type': 'take_profit',
+                                'take_profit_multiple': current_take_profit_multiple
+                            })
+                            
+                            position = 0
+                            last_trend = row['trend']
+                            continue
+                    
+                    # 检查是否触及止损或反向信号
+                    if row['high'] >= stop_loss or row['trade_signal'] == 1:
+                        exit_price = round(stop_loss) if row['high'] >= stop_loss else round(row['close'])
                         pnl = position * (exit_price - entry_price)
                         total_pnl += pnl
                         returns.append(pnl / entry_price)
@@ -207,13 +270,12 @@ class TrendFollowStrategy:
                             'exit_date': date.strftime('%Y-%m-%d %H:%M'),
                             'exit_price': float(exit_price),
                             'position': 'short',
-                            'pnl': float(pnl) * 10,  # 每手10吨
-                            'exit_type': 'take_profit' if row['low'] <= take_profit else (
-                                'stop_loss' if row['high'] >= stop_loss else 'signal'
-                            )
+                            'pnl': float(pnl) * 10,
+                            'exit_type': 'stop_loss' if row['high'] >= stop_loss else 'signal',
+                            'take_profit_multiple': current_take_profit_multiple
                         })
                         
-                        position = 0  # 平仓
+                        position = 0
                         last_trend = row['trend']
         
         # 计算月度盈亏
