@@ -35,5 +35,9 @@ export const API_ENDPOINTS = {
     data15min: `${API_BASE_URL}/trend_follow/15min`,
     data60min: `${API_BASE_URL}/trend_follow/60min`,
     backtest: `${API_BASE_URL}/trend_follow/backtest`
+  },
+  obvAdxEma: {
+    data: `${API_BASE_URL}/obv_adx_ema/data`,
+    backtest: `${API_BASE_URL}/obv_adx_ema/backtest`
   }
 }; 

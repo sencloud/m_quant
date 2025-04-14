@@ -4,6 +4,7 @@ import ETFStrategy from '../components/trading/ETFStrategy';
 import FuturesOptionsHedgeStrategy from '../components/trading/FuturesOptionsHedgeStrategy';
 import ArbitrageStrategy from '../components/trading/ArbitrageStrategy';
 import TrendFollowStrategy from '../components/trading/TrendFollowStrategy';
+import OBVADXEMAStrategy from '../components/trading/OBVADXEMAStrategy';
 import { ChartBarIcon, ChartPieIcon, ArrowsRightLeftIcon, ChevronDownIcon } from '@heroicons/react/24/outline';
 
 interface StrategyCardProps {
@@ -106,6 +107,18 @@ const Trading: React.FC = () => {
           icon={<ArrowsRightLeftIcon />}
         >
           <ArbitrageStrategy />
+        </StrategyCard>
+
+        <StrategyCard
+          title="OBV-ADX-EMA组合策略"
+          tags={[
+            { text: "技术面策略", color: "text-blue-800 bg-blue-100" },
+            { text: "趋势跟踪", color: "text-purple-800 bg-purple-100" },
+            { text: "已回测", color: "text-green-800 bg-green-100" }
+          ]}
+          icon={<ChartBarIcon />}
+        >
+          <OBVADXEMAStrategy />
         </StrategyCard>
 
         {/* 期货期权对冲策略部分 */}

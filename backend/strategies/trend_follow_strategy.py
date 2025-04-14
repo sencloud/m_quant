@@ -176,7 +176,7 @@ class TrendFollowStrategy:
                         if row['adx'] > ADX_THRESHOLD and take_profit_level < 3:
                             # 渐进式调整止盈倍数
                             take_profit_level += 1
-                            current_take_profit_multiple = 1.5 + (take_profit_level * 2.5)  # 1.5 -> 2.0 -> 2.5 -> 3.0
+                            current_take_profit_multiple = 1.5 + (take_profit_level * 0.5)  # 1.5 -> 2.0 -> 2.5 -> 3.0
                             # 更新止盈价位
                             take_profit = entry_price + (entry_atr * current_take_profit_multiple)
                         else:
