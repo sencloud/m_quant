@@ -7,6 +7,46 @@ from typing import List, Optional, Dict
 from config import settings
 from models.market_data import FuturesData, ETFData, OptionsData
 from utils.logger import logger
+import time
+import threading
+import os
+
+class RateLimiter:
+    """令牌桶算法实现的限流器"""
+    def __init__(self, rate, capacity):
+        self.rate = rate  # 令牌产生速率
+        self.capacity = capacity  # 桶的容量
+        self.tokens = capacity  # 当前令牌数
+        self.last_update = time.time()
+        self.lock = threading.Lock()
+    
+    def acquire(self):
+        """获取一个令牌，如果没有令牌则等待"""
+        with self.lock:
+            now = time.time()
+            # 计算从上次更新到现在产生的令牌数
+            elapsed = now - self.last_update
+            new_tokens = elapsed * self.rate
+            
+            # 更新令牌数和上次更新时间
+            self.tokens = min(self.capacity, self.tokens + new_tokens)
+            self.last_update = now
+            
+            if self.tokens < 1:
+                # 计算需要等待的时间
+                wait_time = (1 - self.tokens) / self.rate
+                logger.warning(f"API限流: 需要等待 {wait_time:.2f} 秒")
+                time.sleep(wait_time)
+                # 重新计算令牌数
+                now = time.time()
+                elapsed = now - self.last_update
+                new_tokens = elapsed * self.rate
+                self.tokens = min(self.capacity, self.tokens + new_tokens)
+                self.last_update = now
+            
+            # 消耗一个令牌
+            self.tokens -= 1
+            return True
 
 class MarketDataService:
     def __init__(self):
@@ -21,12 +61,34 @@ class MarketDataService:
                 self.pro = ts.pro_api()
                 self.logger = logger
                 logger.debug("Tushare API初始化完成")
+                
+                # 初始化限流器: 每分钟最多280次调用(留有余地)
+                self.rate_limiter = RateLimiter(rate=280/60, capacity=280)
         except Exception as e:
             logger.error(f"市场数据服务初始化失败: {str(e)}")
             import traceback
             traceback.print_exc()
             self.pro = None
             self.logger = logger
+            self.rate_limiter = None
+
+    def _call_tushare_api(self, func, *args, **kwargs):
+        """包装Tushare API调用，添加限流保护"""
+        if self.rate_limiter:
+            self.rate_limiter.acquire()
+        
+        try:
+            return func(*args, **kwargs)
+        except Exception as e:
+            if "每分钟最多访问该接口300次" in str(e):
+                logger.error(f"Tushare API限流: {str(e)}")
+                # 如果是限流错误，等待一段时间后重试
+                time.sleep(2)
+                # 重试时也要使用限流保护
+                if self.rate_limiter:
+                    self.rate_limiter.acquire()
+                return self._call_tushare_api(func, *args, **kwargs)
+            raise
 
     def _get_futures_data(self, start_date: Optional[str] = None, end_date: Optional[str] = None, symbol: str = "M") -> List[FuturesData]:
         """获取期货数据"""
@@ -39,7 +101,8 @@ class MarketDataService:
             if len(symbol) == 1:
                 logger.info(f"获取主力合约 - 品种: {symbol}")
                 # 获取最近的交易日
-                trade_cal = self.pro.trade_cal(
+                trade_cal = self._call_tushare_api(
+                    self.pro.trade_cal,
                     exchange='DCE',
                     is_open='1',
                     start_date=(datetime.now() - timedelta(days=10)).strftime('%Y%m%d'),
@@ -66,7 +129,8 @@ class MarketDataService:
                     current_date = row['cal_date']
                     logger.info(f"尝试获取{current_date}的主力合约")
                     
-                    temp_main_contract = self.pro.fut_mapping(
+                    temp_main_contract = self._call_tushare_api(
+                        self.pro.fut_mapping,
                         ts_code=symbol+'.DCE',
                         trade_date=current_date
                     )
@@ -87,7 +151,8 @@ class MarketDataService:
                 logger.info(f"获取到主力合约: {symbol}, 日期: {latest_trade_date}")
             
             # 获取合约基本信息
-            contract_info = self.pro.fut_basic(
+            contract_info = self._call_tushare_api(
+                self.pro.fut_basic,
                 ts_code=symbol,
                 exchange='DCE'
             )
@@ -117,7 +182,8 @@ class MarketDataService:
             logger.info(f"开始获取期货数据 - 品种: {symbol}, 开始日期: {start_date}, 结束日期: {end_date}")
             
             # 获取合约数据
-            df = self.pro.fut_daily(
+            df = self._call_tushare_api(
+                self.pro.fut_daily,
                 ts_code=symbol,
                 start_date=start_date,
                 end_date=end_date
@@ -317,7 +383,8 @@ class MarketDataService:
                 end_date = datetime.now().strftime('%Y%m%d')
             
             # 获取ETF日线数据
-            df = self.pro.fund_daily(
+            df = self._call_tushare_api(
+                self.pro.fund_daily,
                 ts_code=symbol,
                 start_date=start_date,
                 end_date=end_date
@@ -392,7 +459,8 @@ class MarketDataService:
     ) -> List[OptionsData]:
         logger.info(f"获取期权数据 - 标的: {underlying}, 交易所: {exchange}")
         try:
-            df = self.pro.opt_basic(
+            df = self._call_tushare_api(
+                self.pro.opt_basic,
                 underlying=underlying,
                 exchange=exchange
             )
@@ -741,7 +809,8 @@ class MarketDataService:
             
             # 获取当前主力合约
             # 获取最近的交易日
-            trade_cal = self.pro.trade_cal(
+            trade_cal = self._call_tushare_api(
+                self.pro.trade_cal,
                 exchange='DCE',
                 is_open='1',
                 start_date=(datetime.now() - timedelta(days=10)).strftime('%Y%m%d'),
@@ -762,7 +831,8 @@ class MarketDataService:
                 current_date = row['cal_date']
                 logger.info(f"尝试获取{current_date}的主力合约")
                 
-                temp_main_contract = self.pro.fut_mapping(
+                temp_main_contract = self._call_tushare_api(
+                    self.pro.fut_mapping,
                     ts_code=symbol+'.DCE',
                     trade_date=current_date
                 )
@@ -791,7 +861,8 @@ class MarketDataService:
             current_year = int(contract_year)  # 使用当前合约的年份作为基准
             
             # 获取当前合约的数据作为参考
-            current_contract_info = self.pro.fut_basic(
+            current_contract_info = self._call_tushare_api(
+                self.pro.fut_basic,
                 ts_code=f"{current_contract}.DCE",
                 exchange='DCE'
             )
@@ -813,7 +884,8 @@ class MarketDataService:
                 
                 try:
                     # 获取合约基本信息
-                    contract_info = self.pro.fut_basic(
+                    contract_info = self._call_tushare_api(
+                        self.pro.fut_basic,
                         ts_code=f"{historical_contract}.DCE",
                         exchange='DCE'
                     )
@@ -833,7 +905,8 @@ class MarketDataService:
                         logger.info(f"合约 {historical_contract} 交易期间: {start_date} - {end_date}")
                         
                         # 获取该合约的历史数据
-                        df = self.pro.fut_daily(
+                        df = self._call_tushare_api(
+                            self.pro.fut_daily,
                             ts_code=f"{historical_contract}.DCE",
                             start_date=start_date,
                             end_date=end_date
@@ -900,4 +973,495 @@ class MarketDataService:
             
         except Exception as e:
             logger.error(f"获取历史同期数据失败: {str(e)}")
-            raise 
+            raise
+
+    def get_monthly_probability_data(self, symbol: str = "M") -> dict:
+        """获取历史月度涨跌概率数据，按01、05、09三个月度合约分别计算"""
+        try:
+            logger.info(f"开始获取历史月度涨跌概率数据 - 品种: {symbol}")
+            
+            # 定义要分析的月度合约
+            monthly_contracts = ['01', '05', '09']
+            result = {}
+            
+            # 获取当前文件的绝对路径
+            current_dir = os.path.dirname(os.path.abspath(__file__))
+            daily_data_dir = os.path.join(current_dir, '..', 'daily_data')
+            
+            # 确保目录存在
+            if not os.path.exists(daily_data_dir):
+                logger.error(f"目录不存在: {daily_data_dir}")
+                return {}
+                
+            logger.info(f"查找目录: {daily_data_dir}")
+            
+            # 获取所有合约文件
+            all_files = os.listdir(daily_data_dir)
+            logger.info(f"目录内容: {all_files}")
+            
+            # 按月份分组处理文件
+            for month in monthly_contracts:
+                # 存储该月份合约的结果，使用 M01、M05、M09 格式
+                contract_key = f'{symbol}{month}'  # 例如：M01、M05、M09
+                logger.info(f"处理{month}月合约数据， contract_key: {contract_key}")
+                
+                # 筛选该月份的合约文件
+                contract_files = []
+                for file in all_files:
+                    if (file.startswith(f'{symbol}') and 
+                        file.endswith('.DCE_future_daily_20100101_20251231.csv')):
+                        # 从文件名中提取月份（例如从M2401.DCE_future_daily_20100101_20251231.csv中提取01）
+                        file_month = file[3:5]
+                        logger.info(f"检查文件: {file}, 提取的月份: {file_month}, 目标月份: {month}")
+                        if file_month == month:
+                            contract_files.append(file)
+                
+                logger.info(f"找到的{month}月合约文件: {contract_files}")
+                
+                if not contract_files:
+                    logger.warning(f"未找到{month}月合约数据")
+                    continue
+                
+                # 读取并合并所有合约数据
+                all_data = []
+                for file in contract_files:
+                    try:
+                        file_path = os.path.join(daily_data_dir, file)
+                        logger.info(f"读取文件: {file_path}")
+                        df = pd.read_csv(file_path)
+                        logger.info(f"文件 {file} 数据形状: {df.shape}")
+                        logger.info(f"文件 {file} 列名: {df.columns.tolist()}")
+                        
+                        # 添加合约信息
+                        contract = file.split('.')[0]  # 例如：M2401
+                        df['contract'] = contract
+                        
+                        # 转换日期格式
+                        df['date'] = pd.to_datetime(df['date'], format='%Y%m%d')
+                        df['year'] = df['date'].dt.year
+                        df['month'] = df['date'].dt.month
+                        
+                        # 根据合约月份过滤数据
+                        contract_year = int(contract[1:3])  # 例如从M2401提取24
+                        contract_month = int(contract[3:])  # 例如从M2401提取01
+                        
+                        # 将两位数年份转换为四位数
+                        if contract_year < 50:  # 假设20xx年
+                            full_year = 2000 + contract_year
+                        else:  # 假设19xx年
+                            full_year = 1900 + contract_year
+                            
+                        # 计算合约的开始和结束月份
+                        if contract_month == 1:  # 01合约
+                            # 保留前一年2月到12月的数据
+                            mask = (df['year'] == full_year - 1) & (df['month'] >= 2)
+                        elif contract_month == 5:  # 05合约
+                            # 保留前一年6月到12月，以及当年1月到4月的数据
+                            mask = ((df['year'] == full_year - 1) & (df['month'] >= 6)) | \
+                                   ((df['year'] == full_year) & (df['month'] <= 4))
+                        else:  # 09合约
+                            # 保留前一年10月到12月，以及当年1月到8月的数据
+                            mask = ((df['year'] == full_year - 1) & (df['month'] >= 10)) | \
+                                   ((df['year'] == full_year) & (df['month'] <= 8))
+                        
+                        # 添加调试日志
+                        logger.info(f"合约 {contract} 年份: {contract_year}, 完整年份: {full_year}, 月份: {contract_month}")
+                        logger.info(f"数据年份范围: {df['year'].min()} - {df['year'].max()}")
+                        logger.info(f"数据月份范围: {df['month'].min()} - {df['month'].max()}")
+                        logger.info(f"过滤条件: {mask.sum()} 条数据符合条件")
+                        
+                        # 打印每个月份的数据数量
+                        month_counts = df.groupby(['year', 'month']).size()
+                        logger.info(f"每月数据数量:\n{month_counts}")
+                        
+                        df = df[mask]
+                        logger.info(f"过滤后的数据形状: {df.shape}")
+                        logger.info(f"过滤后的数据示例:\n{df[['date', 'year', 'month']].head()}")
+                        
+                        if not df.empty:
+                            all_data.append(df)
+                            logger.info(f"成功添加合约 {contract} 的数据，形状: {df.shape}")
+                        else:
+                            logger.warning(f"合约 {contract} 过滤后没有数据")
+                            
+                    except Exception as e:
+                        logger.error(f"读取文件{file}失败: {str(e)}")
+                        continue
+                
+                if not all_data:
+                    logger.warning(f"未能读取任何{month}月合约数据")
+                    continue
+                
+                # 合并所有合约数据
+                combined_df = pd.concat(all_data, ignore_index=True)
+                logger.info(f"合并后的数据形状: {combined_df.shape}")
+                
+                if combined_df.empty:
+                    logger.warning(f"合并后的数据为空")
+                    continue
+                
+                # 计算每日涨跌标志
+                combined_df['daily_change'] = np.where(combined_df['close'] > combined_df['open'], 1, 0)
+                
+                # 计算月内波动率
+                combined_df['volatility'] = (combined_df['high'] - combined_df['low']) / combined_df['close']
+                
+                # 创建热力图数据 - 按合约名称和月份组织
+                heatmap_data = {}
+                
+                # 获取所有合约
+                contracts = combined_df['contract'].unique()
+                logger.info(f"找到的合约: {contracts}")
+                
+                # 对每个合约计算月度统计
+                for contract in contracts:
+                    contract_data = combined_df[combined_df['contract'] == contract]
+                    logger.info(f"处理合约 {contract} 的数据，形状: {contract_data.shape}")
+                    
+                    # 计算该合约每个月的统计
+                    monthly_stats = contract_data.groupby('month').agg({
+                        'daily_change': ['sum', 'count'],
+                        'volatility': 'mean'
+                    }).reset_index()
+                    
+                    # 重命名列
+                    monthly_stats.columns = ['month', 'up_days', 'total_days', 'avg_volatility']
+                    
+                    # 计算上涨概率和标准差
+                    monthly_stats['up_prob'] = monthly_stats['up_days'] / monthly_stats['total_days']
+                    monthly_stats['std'] = np.sqrt(monthly_stats['up_prob'] * (1 - monthly_stats['up_prob']) / monthly_stats['total_days'])
+                    
+                    # 存储到热力图数据中
+                    heatmap_data[contract] = {}
+                    for _, row in monthly_stats.iterrows():
+                        month = int(row['month'])
+                        stats = {
+                            'up_days': int(row['up_days']),
+                            'total_days': int(row['total_days']),
+                            'up_prob': float(row['up_prob']),
+                            'std': float(row['std']),
+                            'avg_volatility': float(row['avg_volatility'])
+                        }
+                        heatmap_data[contract][month] = stats
+                        logger.info(f"添加热力图数据: 合约={contract}, 月份={month}, 统计={stats}")
+                
+                # 计算每个月份的平均统计
+                monthly_avg_stats = []
+                for m in range(1, 13):
+                    month_data = combined_df[combined_df['month'] == m]
+                    if not month_data.empty:
+                        up_days = int(month_data['daily_change'].sum())
+                        total_days = int(len(month_data))
+                        up_prob = float(up_days / total_days)
+                        std = float(np.sqrt(up_prob * (1 - up_prob) / total_days))
+                        avg_volatility = float(month_data['volatility'].mean())
+                        
+                        monthly_avg_stats.append({
+                            'month': m,
+                            'up_days': up_days,
+                            'total_days': total_days,
+                            'up_prob': up_prob,
+                            'std': std,
+                            'avg_volatility': avg_volatility
+                        })
+                        logger.info(f"月份{m}统计: 上涨天数={up_days}, 总天数={total_days}, 上涨概率={up_prob:.2f}, 标准差={std:.4f}, 平均波动率={avg_volatility:.4f}")
+                
+                result[contract_key] = {
+                    "heatmap_data": heatmap_data,
+                    "monthly_avg_stats": monthly_avg_stats
+                }
+                logger.info(f"存储{contract_key}合约结果: {result[contract_key]}")
+            
+            # 添加关键事件标注
+            key_events = [
+                {
+                    "date": "2025-04-01",
+                    "event": "中国对美关税反制",
+                    "impact": "大豆进口成本上升，豆粕价格上涨"
+                },
+                {
+                    "date": "2025-03-15",
+                    "event": "USDA种植意向报告",
+                    "impact": "美豆种植面积下调，远期合约价格上涨"
+                },
+                {
+                    "date": "2024-12-01",
+                    "event": "巴西大豆出口政策调整",
+                    "impact": "南美大豆出口节奏变化，影响全球供应"
+                },
+                {
+                    "date": "2024-09-01",
+                    "event": "美国中西部干旱",
+                    "impact": "美豆减产预期，价格大幅上涨"
+                },
+                {
+                    "date": "2024-06-01",
+                    "event": "阿根廷大豆产量恢复",
+                    "impact": "南美供应增加，全球价格承压"
+                },
+                {
+                    "date": "2024-03-01",
+                    "event": "中国生猪存栏回升",
+                    "impact": "豆粕需求增加，价格支撑"
+                },
+                {
+                    "date": "2023-07-01",
+                    "event": "厄尔尼诺现象",
+                    "impact": "全球气候异常，影响大豆种植和产量预期"
+                },
+                {
+                    "date": "2022-03-01",
+                    "event": "俄乌冲突",
+                    "impact": "全球粮食供应链中断，豆粕价格大幅上涨"
+                },
+                {
+                    "date": "2021-05-01",
+                    "event": "巴西干旱",
+                    "impact": "南美大豆减产，全球供应紧张"
+                },
+                {
+                    "date": "2020-01-01",
+                    "event": "新冠疫情",
+                    "impact": "全球供应链中断，豆粕价格波动加剧"
+                },
+                {
+                    "date": "2019-08-01",
+                    "event": "非洲猪瘟",
+                    "impact": "中国生猪存栏大幅下降，豆粕需求减少"
+                },
+                {
+                    "date": "2018-06-01",
+                    "event": "中美贸易战",
+                    "impact": "大豆进口受限，豆粕价格波动加大"
+                },
+                {
+                    "date": "2017-03-01",
+                    "event": "巴西腐败案",
+                    "impact": "巴西政治动荡，影响大豆出口"
+                },
+                {
+                    "date": "2016-06-01",
+                    "event": "英国脱欧",
+                    "impact": "全球金融市场动荡，大宗商品价格波动"
+                },
+                {
+                    "date": "2015-08-01",
+                    "event": "人民币贬值",
+                    "impact": "进口成本上升，豆粕价格上涨"
+                },
+                {
+                    "date": "2014-03-01",
+                    "event": "克里米亚危机",
+                    "impact": "地缘政治风险上升，农产品价格波动"
+                },
+                {
+                    "date": "2013-05-01",
+                    "event": "美国干旱",
+                    "impact": "美豆减产，全球供应紧张"
+                },
+                {
+                    "date": "2012-07-01",
+                    "event": "美国中西部干旱",
+                    "impact": "美豆产量大幅下降，价格创历史新高"
+                },
+                {
+                    "date": "2011-03-01",
+                    "event": "日本福岛核事故",
+                    "impact": "全球食品安全担忧，农产品价格波动"
+                },
+                {
+                    "date": "2010-06-01",
+                    "event": "俄罗斯小麦出口禁令",
+                    "impact": "全球粮食供应紧张，豆粕替代需求增加"
+                },
+                {
+                    "date": "2009-04-01",
+                    "event": "甲型H1N1流感",
+                    "impact": "全球食品安全担忧，农产品价格波动"
+                },
+                {
+                    "date": "2008-09-01",
+                    "event": "全球金融危机",
+                    "impact": "大宗商品价格暴跌，豆粕需求下降"
+                },
+                {
+                    "date": "2007-08-01",
+                    "event": "美国次贷危机",
+                    "impact": "金融市场动荡，大宗商品价格波动"
+                },
+                {
+                    "date": "2006-03-01",
+                    "event": "禽流感疫情",
+                    "impact": "养殖业受损，豆粕需求下降"
+                },
+                {
+                    "date": "2005-08-01",
+                    "event": "卡特里娜飓风",
+                    "impact": "美国港口受损，影响大豆出口"
+                },
+                {
+                    "date": "2004-12-01",
+                    "event": "印度洋海啸",
+                    "impact": "东南亚地区受灾，影响农产品贸易"
+                }
+            ]
+            
+            # 添加关键事件到结果中
+            result['key_events'] = key_events
+            
+            logger.info(f"最终返回结果: {result}")
+            return result
+            
+        except Exception as e:
+            logger.error(f"获取历史月度涨跌概率数据失败: {str(e)}")
+            import traceback
+            logger.error(f"错误堆栈: {traceback.format_exc()}")
+            raise
+            
+    def get_event_price_data(self, event_date: str, contract: str = "M01", days_before: int = 30, days_after: int = 30) -> List[FuturesData]:
+        """获取事件前后的价格走势数据
+        
+        Args:
+            event_date: 事件日期，格式为YYYY-MM-DD
+            contract: 合约代码，如M01、M05、M09
+            days_before: 事件前的天数
+            days_after: 事件后的天数
+            
+        Returns:
+            事件前后的价格数据列表
+        """
+        try:
+            logger.info(f"开始获取事件价格数据 - 事件日期: {event_date}, 合约: {contract}, 前后天数: {days_before}/{days_after}")
+            
+            # 获取当前文件的绝对路径
+            current_dir = os.path.dirname(os.path.abspath(__file__))
+            daily_data_dir = os.path.join(current_dir, '..', 'daily_data')
+            
+            # 确保目录存在
+            if not os.path.exists(daily_data_dir):
+                logger.error(f"目录不存在: {daily_data_dir}")
+                return []
+            
+            # 将事件日期转换为datetime对象
+            event_date_obj = datetime.strptime(event_date, '%Y-%m-%d')
+            
+            # 计算日期范围
+            start_date = event_date_obj - timedelta(days=days_before)
+            end_date = event_date_obj + timedelta(days=days_after)
+            
+            # 格式化日期为YYYYMMDD格式
+            start_date_str = start_date.strftime('%Y%m%d')
+            end_date_str = end_date.strftime('%Y%m%d')
+            
+            # 计算事件发生时的合约代码
+            event_year = event_date_obj.year
+            event_month = event_date_obj.month
+            contract_month = int(contract[1:])  # 从M01中提取01
+            
+            # 根据事件日期和合约月份计算实际的合约代码
+            # 例如：2016年6月的事件，对于M01合约，应该查找M1701
+            # 合约规则：01合约在每年2月上市，05合约在每年6月上市，09合约在每年10月上市
+            if contract_month == 1:  # 01合约
+                if event_month >= 2:  # 2月及以后的事件，使用下一年的01合约
+                    contract_year = event_year + 1
+                else:  # 1月的事件，使用当年的01合约
+                    contract_year = event_year
+            elif contract_month == 5:  # 05合约
+                if event_month >= 6:  # 6月及以后的事件，使用下一年的05合约
+                    contract_year = event_year + 1
+                else:  # 5月及以前的事件，使用当年的05合约
+                    contract_year = event_year
+            else:  # 09合约
+                if event_month >= 10:  # 10月及以后的事件，使用下一年的09合约
+                    contract_year = event_year + 1
+                else:  # 9月及以前的事件，使用当年的09合约
+                    contract_year = event_year
+            
+            # 构建完整的合约代码，例如M1701
+            full_contract = f"{contract[0]}{str(contract_year)[-2:]}{contract[1:]}"
+            logger.info(f"计算得到的合约代码: {full_contract}")
+            
+            # 查找匹配的合约文件
+            contract_files = []
+            for file in os.listdir(daily_data_dir):
+                if (file.startswith(full_contract) and 
+                    file.endswith('.DCE_future_daily_20100101_20251231.csv')):
+                    contract_files.append(file)
+            
+            if not contract_files:
+                logger.warning(f"未找到合约 {full_contract} 的数据文件")
+                return []
+            
+            # 读取并合并所有合约数据
+            all_data = []
+            for file in contract_files:
+                try:
+                    file_path = os.path.join(daily_data_dir, file)
+                    df = pd.read_csv(file_path)
+                    
+                    # 转换日期格式
+                    df['date'] = pd.to_datetime(df['date'], format='%Y%m%d')
+                    
+                    # 过滤日期范围
+                    mask = (df['date'] >= start_date) & (df['date'] <= end_date)
+                    df = df[mask]
+                    
+                    if not df.empty:
+                        all_data.append(df)
+                        
+                except Exception as e:
+                    logger.error(f"读取文件{file}失败: {str(e)}")
+                    continue
+            
+            if not all_data:
+                logger.warning(f"未找到事件日期 {event_date} 前后的数据")
+                return []
+            
+            # 合并所有合约数据
+            combined_df = pd.concat(all_data, ignore_index=True)
+            
+            # 按日期排序
+            combined_df = combined_df.sort_values('date')
+            
+            # 转换为FuturesData列表
+            result = []
+            for _, row in combined_df.iterrows():
+                # 处理可能的无穷大或NaN值
+                def safe_float(value):
+                    try:
+                        if pd.isna(value) or np.isinf(value):
+                            return 0.0
+                        return float(value)
+                    except (ValueError, TypeError):
+                        return 0.0
+                
+                data = {
+                    'ts_code': f"{full_contract}.DCE",
+                    'trade_date': row['date'].strftime('%Y%m%d'),
+                    'pre_close': safe_float(row['pre_close']),
+                    'pre_settle': safe_float(row['pre_settle']),
+                    'open': safe_float(row['open']),
+                    'high': safe_float(row['high']),
+                    'low': safe_float(row['low']),
+                    'close': safe_float(row['close']),
+                    'settle': safe_float(row['settle']),
+                    'change1': safe_float(row['change1']),
+                    'change2': safe_float(row['change2']),
+                    'vol': safe_float(row['vol']),
+                    'amount': safe_float(row['amount']),
+                    'oi': safe_float(row['oi']),
+                    'oi_chg': safe_float(row['oi_chg']),
+                    'contract': full_contract,
+                    'price': safe_float(row['close']),  # 使用收盘价作为当前价格
+                    'historicalPrices': []  # 这个字段会在API层面处理
+                }
+                result.append(FuturesData(**data))
+            
+            logger.info(f"成功获取事件价格数据，共{len(result)}条记录")
+            return result
+            
+        except Exception as e:
+            logger.error(f"获取事件价格数据失败: {str(e)}")
+            import traceback
+            logger.error(f"错误堆栈: {traceback.format_exc()}")
+            return [] 

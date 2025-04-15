@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import Home from './pages/Home';
 import Trading from './pages/Trading';
 import Research from './pages/Research';
+import ProAnalysis from './pages/ProAnalysis';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 import TermsOfService from './pages/TermsOfService';
 import Disclaimer from './pages/Disclaimer';
@@ -18,6 +19,7 @@ const App: React.FC = () => {
           <Route path="/" element={<Home />} />
           <Route path="/trading" element={<Trading />} />
           <Route path="/research" element={<Research />} />
+          <Route path="/pro-analysis" element={<ProAnalysis />} />
           <Route path="/privacy" element={<PrivacyPolicy />} />
           <Route path="/terms" element={<TermsOfService />} />
           <Route path="/disclaimer" element={<Disclaimer />} />

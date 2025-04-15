@@ -229,4 +229,37 @@ async def get_historical_comparison_data(
         return data
     except Exception as e:
         logger.error(f"历史同期数据请求失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/futures/monthly-probability", response_model=dict)
+async def get_monthly_probability_data(
+    symbol: str = "M",
+    service: MarketDataService = Depends(get_market_data_service)
+):
+    """获取历史月度涨跌概率数据"""
+    logger.info(f"收到历史月度涨跌概率数据请求 - 品种: {symbol}")
+    try:
+        data = service.get_monthly_probability_data(symbol)
+        logger.info(f"成功返回历史月度涨跌概率数据")
+        return data
+    except Exception as e:
+        logger.error(f"历史月度涨跌概率数据请求失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/futures/event-price", response_model=List[FuturesData])
+async def get_event_price_data(
+    event_date: str,
+    contract: str = "M01",
+    days_before: int = 30,
+    days_after: int = 30,
+    service: MarketDataService = Depends(get_market_data_service)
+):
+    """获取事件前后的价格走势数据"""
+    logger.info(f"收到事件价格数据请求 - 事件日期: {event_date}, 合约: {contract}, 前后天数: {days_before}/{days_after}")
+    try:
+        data = service.get_event_price_data(event_date, contract, days_before, days_after)
+        logger.info(f"成功返回事件价格数据，共{len(data)}条记录")
+        return data
+    except Exception as e:
+        logger.error(f"事件价格数据请求失败: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e)) 

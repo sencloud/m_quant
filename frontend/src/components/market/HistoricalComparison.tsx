@@ -1,8 +1,10 @@
 import React, { useMemo } from 'react';
 import ReactECharts from 'echarts-for-react';
-import { Card } from 'antd';
+import { Card, Button } from 'antd';
 import { ContractPrice } from '../../types/market';
 import dayjs from 'dayjs';
+import { Link } from 'react-router-dom';
+import { CrownOutlined } from '@ant-design/icons';
 
 interface HistoricalComparisonProps {
   currentContract: ContractPrice;
@@ -152,7 +154,23 @@ const HistoricalComparison: React.FC<HistoricalComparisonProps> = ({
   }, [currentContract, historicalContracts]);
 
   return (
-    <Card className="mb-8">
+    <Card 
+      className="mb-8"
+      title={
+        <div className="flex justify-between items-center">
+          <span>历史走势比对</span>
+          <Link to="/pro-analysis">
+            <Button 
+              type="primary" 
+              icon={<CrownOutlined />}
+              className="bg-yellow-500 hover:bg-yellow-600 border-yellow-500 hover:border-yellow-600"
+            >
+              高级分析
+            </Button>
+          </Link>
+        </div>
+      }
+    >
       <ReactECharts 
         option={option}
         style={{ height: '400px' }}

@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { Link, NavLink } from 'react-router-dom';
+import { Dropdown } from 'antd';
+import { DownOutlined, CrownOutlined } from '@ant-design/icons';
 
 const Header: React.FC = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -10,6 +12,15 @@ const Header: React.FC = () => {
       ? "text-blue-600 border-b-2 border-blue-600 hover:text-blue-700 px-3 py-2 text-sm font-medium"
       : "text-gray-700 hover:text-gray-900 px-3 py-2 text-sm font-medium";
   };
+
+  // PRO功能菜单项
+  const proMenuItems = [
+    {
+      key: 'pro-analysis',
+      label: <Link to="/pro-analysis">历史分析</Link>,
+      icon: <CrownOutlined />
+    }
+  ];
 
   return (
     <header className="bg-white shadow-sm">
@@ -40,6 +51,13 @@ const Header: React.FC = () => {
             <NavLink to="/research" className={getNavLinkClass}>
               研究报告
             </NavLink>
+            <Dropdown menu={{ items: proMenuItems }} placement="bottomRight">
+              <a className="text-yellow-600 hover:text-yellow-700 px-3 py-2 text-sm font-medium flex items-center">
+                <CrownOutlined className="mr-1" />
+                PRO
+                <DownOutlined className="ml-1" />
+              </a>
+            </Dropdown>
           </nav>
 
           {/* Mobile menu button */}
@@ -79,6 +97,16 @@ const Header: React.FC = () => {
             onClick={() => setIsMenuOpen(false)}
           >
             研究报告
+          </NavLink>
+          <NavLink
+            to="/pro-analysis"
+            className={getNavLinkClass}
+            onClick={() => setIsMenuOpen(false)}
+          >
+            <span className="flex items-center">
+              <CrownOutlined className="mr-1 text-yellow-600" />
+              PRO 历史分析
+            </span>
           </NavLink>
         </div>
       </div>

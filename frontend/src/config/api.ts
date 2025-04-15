@@ -14,7 +14,8 @@ export const API_ENDPOINTS = {
     futuresInventory: `${API_BASE_URL}/market/futures/inventory`,
     inventory: `${API_BASE_URL}/market/inventory`,
     technical: `${API_BASE_URL}/market/technical`,
-    historical: `${API_BASE_URL}/market/futures/historical`
+    historical: `${API_BASE_URL}/market/futures/historical`,
+    monthlyProbability: `${API_BASE_URL}/market/futures/monthly-probability`
   },
   analysis: {
     fundamental: `${API_BASE_URL}/fundamental/analysis`,
