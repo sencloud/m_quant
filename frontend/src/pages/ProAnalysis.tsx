@@ -807,7 +807,7 @@ const ProAnalysis: React.FC = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="text-center mb-12">
           <h1 className="text-3xl font-bold text-gray-900 relative inline-block">
-            历史分析
+            历史规律分析
             <span className="absolute -top-3 -right-12 bg-gradient-to-r from-yellow-400 to-yellow-600 text-white text-xs font-bold px-2 py-1 rounded-full shadow-md transform rotate-12">
               PRO
             </span>
@@ -817,27 +817,27 @@ const ProAnalysis: React.FC = () => {
           </p>
         </div>
 
-        <div className="mb-6 flex justify-center space-x-4">
+        <div className="mb-6 flex space-x-4">
           <Tag 
             color={getContractTagColor('M01')} 
             style={{ cursor: 'pointer', padding: '4px 12px', fontSize: '16px' }}
             onClick={() => handleContractChange('M01')}
           >
-            01合约
+            豆粕01月合约
           </Tag>
           <Tag 
             color={getContractTagColor('M05')} 
             style={{ cursor: 'pointer', padding: '4px 12px', fontSize: '16px' }}
             onClick={() => handleContractChange('M05')}
           >
-            05合约
+            豆粕05月合约
           </Tag>
           <Tag 
             color={getContractTagColor('M09')} 
             style={{ cursor: 'pointer', padding: '4px 12px', fontSize: '16px' }}
             onClick={() => handleContractChange('M09')}
           >
-            09合约
+            豆粕09月合约
           </Tag>
         </div>
 

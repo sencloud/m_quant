@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import ReactECharts from 'echarts-for-react';
-import { Card, Button } from 'antd';
+import { Card, Button, Tag } from 'antd';
 import { ContractPrice } from '../../types/market';
 import dayjs from 'dayjs';
 import { Link } from 'react-router-dom';
@@ -159,15 +159,12 @@ const HistoricalComparison: React.FC<HistoricalComparisonProps> = ({
       title={
         <div className="flex justify-between items-center">
           <span>历史走势比对</span>
-          <Link to="/pro-analysis">
-            <Button 
-              type="primary" 
-              icon={<CrownOutlined />}
-              className="bg-yellow-500 hover:bg-yellow-600 border-yellow-500 hover:border-yellow-600"
-            >
-              高级分析
-            </Button>
-          </Link>
+          <Tag 
+            className="cursor-pointer px-3 py-1 text-base bg-gradient-to-r from-yellow-400 to-yellow-600 text-white font-bold rounded-full shadow-md transform rotate-12"
+            onClick={() => window.location.href = '/pro-analysis'}
+          >
+            PRO
+          </Tag>
         </div>
       }
     >
