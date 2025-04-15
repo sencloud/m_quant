@@ -44,6 +44,7 @@ const OBVADXEMAStrategy: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [marketData, setMarketData] = useState<MarketData[]>([]);
   const [backtestResult, setBacktestResult] = useState<BacktestResult | null>(null);
+  const [showAllTrades, setShowAllTrades] = useState(false);
   const chartRef = useRef<HTMLDivElement>(null);
   const chartInstance = useRef<echarts.ECharts | null>(null);
   const monthlyChartRef = useRef<HTMLDivElement>(null);
@@ -415,7 +416,10 @@ const OBVADXEMAStrategy: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {(backtestResult.trades || []).map((trade, index) => (
+                  {(backtestResult.trades || [])
+                    .sort((a, b) => new Date(b.entry_date).getTime() - new Date(a.entry_date).getTime())
+                    .slice(0, showAllTrades ? undefined : 10)
+                    .map((trade, index) => (
                     <tr key={index}>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{trade.entry_date}</td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{trade.exit_date}</td>
@@ -443,6 +447,16 @@ const OBVADXEMAStrategy: React.FC = () => {
                   ))}
                 </tbody>
               </table>
+              {backtestResult.trades && backtestResult.trades.length > 10 && (
+                <div className="mt-4 text-center">
+                  <button
+                    onClick={() => setShowAllTrades(!showAllTrades)}
+                    className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+                  >
+                    {showAllTrades ? '收起' : '展开全部'}
+                  </button>
+                </div>
+              )}
             </div>
           </div>
 

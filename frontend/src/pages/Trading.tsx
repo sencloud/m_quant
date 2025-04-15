@@ -50,7 +50,7 @@ const StrategyCard: React.FC<StrategyCardProps> = ({ title, tags, icon, children
         </div>
         <div 
           className={`transition-all duration-300 ease-in-out ${
-            isExpanded ? 'max-h-[10000px] opacity-100' : 'max-h-0 opacity-0'
+            isExpanded ? 'max-h-[20000px] opacity-100' : 'max-h-0 opacity-0'
           } overflow-hidden`}
         >
           <div className="p-6">
