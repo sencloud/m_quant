@@ -850,7 +850,7 @@ const ProAnalysis: React.FC = () => {
               label: (
                 <span>
                   <HeatMapOutlined />
-                  热力图分析
+                  &nbsp; 热力图与核密度分析
                 </span>
               ),
               children: (
@@ -859,12 +859,20 @@ const ProAnalysis: React.FC = () => {
                     <Skeleton active />
                   ) : (
                     <>
-                      <ReactECharts 
-                        option={getHeatmapOption(probabilityData, selectedContract)} 
-                        style={{ height: '600px' }}
-                        notMerge={true}
-                        lazyUpdate={true}
-                      />
+                      <div className="mb-4">
+                        <h2 className="text-xl font-bold text-gray-800">月度上涨概率热力图</h2>
+                        <p className="text-sm text-gray-500 mb-2">注：第一列数据为空是为了剔除合约开始月和交割月的数据，确保分析结果的准确性</p>
+                        <ReactECharts 
+                          option={getHeatmapOption(probabilityData, selectedContract)} 
+                          style={{ height: '600px' }}
+                          notMerge={true}
+                          lazyUpdate={true}
+                        />
+                      </div>
+                      <div className="mt-8">
+                        <h2 className="text-xl font-bold text-gray-800">月度上涨概率核密度估计</h2>
+                        <ReactECharts option={getKdeOption()} style={{ height: '400px' }} />
+                      </div>
                       <div className="mt-8 prose max-w-none">
                         <div className="markdown-content" data-color-mode="light" style={{
                           backgroundColor: 'white',
@@ -932,26 +940,8 @@ const ProAnalysis: React.FC = () => {
               key: '2',
               label: (
                 <span>
-                  <LineChartOutlined />
-                  核密度估计
-                </span>
-              ),
-              children: (
-                <Card>
-                  {isLoading ? (
-                    <Skeleton active />
-                  ) : (
-                    <ReactECharts option={getKdeOption()} style={{ height: '400px' }} />
-                  )}
-                </Card>
-              )
-            },
-            {
-              key: '3',
-              label: (
-                <span>
                   <HistoryOutlined />
-                  关键事件影响
+                  &nbsp; 关键事件影响
                 </span>
               ),
               children: (

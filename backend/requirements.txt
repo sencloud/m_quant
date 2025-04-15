@@ -15,3 +15,5 @@ loguru
 akshare
 httpx
 openai
+beautifulsoup4
+aiohttp

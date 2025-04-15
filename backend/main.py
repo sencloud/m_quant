@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from routers import market_data, trading, fundamental, core_factor, arbitrage, trend_follow, obv_adx_ema
+from routers import market_data, trading, fundamental, core_factor, arbitrage, trend_follow, obv_adx_ema, news
 from config import settings
 from utils.logger import logger
 
@@ -68,6 +68,13 @@ app.include_router(
     tags=["obv_adx_ema"]
 )
 logger.info("OBV、ADX与EMA组合策略路由注册完成")
+
+app.include_router(
+    news.router,
+    prefix=f"{settings.API_V1_STR}/news",
+    tags=["news"]
+)
+logger.info("新闻分析路由注册完成")
 
 @app.on_event("startup")
 async def startup_event():

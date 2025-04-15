@@ -29,13 +29,13 @@ const Header: React.FC = () => {
       ),
     },
     {
-      key: 'option-strategy',
+      key: 'news-analysis',
       label: (
-        <Link to="/option-strategy" className="flex items-center py-2 px-4 hover:bg-gray-50">
+        <Link to="/news-analysis" className="flex items-center py-2 px-4 hover:bg-gray-50">
           <LineChartOutlined className="mr-3 text-yellow-500" />
           <div>
-            <div className="font-medium">期权策略</div>
-            <div className="text-xs text-gray-500">高级期权组合策略</div>
+            <div className="font-medium">消息面分析</div>
+            <div className="text-xs text-gray-500">从宏观、行业等角度分析消息面</div>
           </div>
         </Link>
       ),
@@ -164,14 +164,14 @@ const Header: React.FC = () => {
                 </div>
               </NavLink>
               <NavLink
-                to="/option-strategy"
+                to="/news-analysis"
                 className="flex items-center py-2 px-4 hover:bg-gray-50 rounded-md"
                 onClick={() => setIsMenuOpen(false)}
               >
                 <LineChartOutlined className="mr-3 text-yellow-500" />
                 <div>
-                  <div className="font-medium">期权策略</div>
-                  <div className="text-xs text-gray-500">高级期权组合策略</div>
+                  <div className="font-medium">消息面分析</div>
+                  <div className="text-xs text-gray-500">从宏观、行业等角度分析消息面</div>
                 </div>
               </NavLink>
             </div>

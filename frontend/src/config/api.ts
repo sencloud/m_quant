@@ -40,5 +40,9 @@ export const API_ENDPOINTS = {
   obvAdxEma: {
     data: `${API_BASE_URL}/obv_adx_ema/data`,
     backtest: `${API_BASE_URL}/obv_adx_ema/backtest`
+  },
+  news: {
+    daily: `${API_BASE_URL}/news/daily`,
+    analysis: `${API_BASE_URL}/news/analysis`
   }
 }; 
