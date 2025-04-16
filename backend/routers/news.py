@@ -48,32 +48,6 @@ async def get_news_articles(
         logger.error(f"获取资讯文章失败: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.post("/flash")
-async def create_flash_news(
-    flash_news: FlashNews,
-    service: NewsService = Depends(get_news_service)
-):
-    """创建快讯"""
-    try:
-        result = service.create_flash_news(flash_news)
-        return result
-    except Exception as e:
-        logger.error(f"创建快讯失败: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-@router.post("/articles")
-async def create_news_article(
-    article: NewsArticle,
-    service: NewsService = Depends(get_news_service)
-):
-    """创建资讯文章"""
-    try:
-        result = service.create_news_article(article)
-        return result
-    except Exception as e:
-        logger.error(f"创建资讯文章失败: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
 @router.get("/analysis")
 async def get_news_analysis(
     news_date: str = Query(..., description="新闻日期，格式：YYYYMMDD"),

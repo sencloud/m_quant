@@ -103,14 +103,12 @@ interface OptionsStrategyProps {
 }
 
 const OptionsStrategy: React.FC<OptionsStrategyProps> = ({ selectedDate, fundamentalData }) => {
-  const [isLoading, setIsLoading] = useState(false);
   const [strategyData, setStrategyData] = useState<StrategyResponse | null>(null);
-  const [showReasoning, setShowReasoning] = useState(false);
   const [isStreaming, setIsStreaming] = useState(false);
-  const [isFundamentalExpanded, setIsFundamentalExpanded] = useState(false);
+  const [showReasoning, setShowReasoning] = useState(false);
+  const [isFundamentalExpanded, setIsFundamentalExpanded] = useState(true);
 
   const handleViewAnalysis = async () => {
-    setIsLoading(true);
     setIsStreaming(false);
     setShowReasoning(false);
     try {
@@ -146,11 +144,9 @@ const OptionsStrategy: React.FC<OptionsStrategyProps> = ({ selectedDate, fundame
                   reasoning_content: prev?.reasoning_content || ''
                 }));
               } else if (data.type === 'done') {
-                setIsLoading(false);
                 setIsStreaming(false);
               } else if (data.type === 'error') {
                 console.error('获取策略分析失败:', data.message);
-                setIsLoading(false);
                 setIsStreaming(false);
               }
             }
@@ -163,11 +159,9 @@ const OptionsStrategy: React.FC<OptionsStrategyProps> = ({ selectedDate, fundame
           content: data.content,
           reasoning_content: data.reasoning_content
         });
-        setIsLoading(false);
       }
     } catch (error) {
       console.error('获取策略分析失败:', error);
-      setIsLoading(false);
       setIsStreaming(false);
     }
   };
@@ -485,113 +479,100 @@ const OptionsStrategy: React.FC<OptionsStrategyProps> = ({ selectedDate, fundame
     <div className="space-y-6">
       {/* 基本面分析区域 */}
       <div className="bg-white rounded-lg overflow-hidden mb-6">
-        <div 
-          className="p-4 border-b border-gray-200 bg-gray-50 cursor-pointer hover:bg-gray-100 transition-colors duration-150"
-          onClick={() => setIsFundamentalExpanded(!isFundamentalExpanded)}
-        >
+        <div className="p-4 border-b border-gray-200 bg-gray-50">
           <div className="flex justify-between items-center">
             <div>
               <h2 className="text-lg font-semibold text-gray-900">基本面分析</h2>
               <p className="text-sm text-gray-500 mt-1">多维度分析豆粕市场基本面情况</p>
             </div>
-            <svg 
-              className={`w-5 h-5 text-gray-500 transform transition-transform duration-200 ${isFundamentalExpanded ? 'rotate-180' : ''}`}
-              fill="none" 
-              stroke="currentColor" 
-              viewBox="0 0 24 24"
-            >
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-            </svg>
           </div>
         </div>
         
-        <div className={`transition-all duration-300 ease-in-out ${isFundamentalExpanded ? 'max-h-[5000px] opacity-100' : 'max-h-0 opacity-0 overflow-hidden'}`}>
-          <div className="p-6">
-            {!fundamentalData ? (
-              <div className="text-center text-gray-500 py-4">暂无数据</div>
-            ) : (
-              <>
-                {/* 供需平衡 */}
-                <div className="mb-8">
-                  <h3 className="text-base font-medium text-gray-900 mb-4 flex items-center">
-                    <svg className="w-5 h-5 mr-2 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                    </svg>
-                    供需平衡情况
-                  </h3>
-                  {renderSupplyDemand()}
-                  {fundamentalData?.supply_demand && (
-                    <div className="mt-4 p-3 border border-blue-100 rounded-lg bg-blue-50">
-                      <p className="text-sm text-gray-700">
-                        <span className="font-medium">供需评估：</span>
-                        {fundamentalData.supply_demand.summary}
-                      </p>
-                    </div>
-                  )}
-                </div>
-                
-                {/* 季节性规律 */}
-                <div className="mb-8">
-                  <h3 className="text-base font-medium text-gray-900 mb-4 flex items-center">
-                    <svg className="w-5 h-5 mr-2 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                    </svg>
-                    季节性规律
-                  </h3>
-                  {renderSeasonalPattern()}
-                </div>
-                
-                {/* 南美天气 */}
-                <div className="mb-8">
-                  <h3 className="text-base font-medium text-gray-900 mb-4 flex items-center">
-                    <svg className="w-5 h-5 mr-2 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z" />
-                    </svg>
-                    南美天气状况
-                  </h3>
-                  {renderWeatherConditions()}
-                  {fundamentalData?.weather && (
-                    <div className="mt-4 p-3 border border-yellow-100 rounded-lg bg-yellow-50">
-                      <p className="text-sm text-gray-700">
-                        <span className="font-medium">天气影响评估：</span>
-                        {fundamentalData.weather.summary}
-                      </p>
-                    </div>
-                  )}
-                </div>
-                
-                {/* 加工利润 */}
-                <div className="mb-8">
-                  <h3 className="text-base font-medium text-gray-900 mb-4 flex items-center">
-                    <svg className="w-5 h-5 mr-2 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    豆粕压榨利润
-                  </h3>
-                  {renderCrushProfit()}
-                  {fundamentalData?.crush_profit && (
-                    <div className="mt-4 p-3 border border-red-100 rounded-lg bg-red-50">
-                      <p className="text-sm text-gray-700">
-                        <span className="font-medium">压榨利润评估：</span>
-                        {fundamentalData.crush_profit.summary}
-                      </p>
-                    </div>
-                  )}
-                </div>
-                
-                {/* 基本面综合评估 */}
-                <div>
-                  <h3 className="text-base font-medium text-gray-900 mb-4 flex items-center">
-                    <svg className="w-5 h-5 mr-2 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-                    </svg>
-                    基本面综合评估
-                  </h3>
-                  {renderOverallAssessment()}
-                </div>
-              </>
-            )}
-          </div>
+        <div className="p-6">
+          {!fundamentalData ? (
+            <div className="text-center text-gray-500 py-4">暂无数据</div>
+          ) : (
+            <>
+              {/* 供需平衡 */}
+              <div className="mb-8">
+                <h3 className="text-base font-medium text-gray-900 mb-4 flex items-center">
+                  <svg className="w-5 h-5 mr-2 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                  </svg>
+                  供需平衡情况
+                </h3>
+                {renderSupplyDemand()}
+                {fundamentalData?.supply_demand && (
+                  <div className="mt-4 p-3 border border-blue-100 rounded-lg bg-blue-50">
+                    <p className="text-sm text-gray-700">
+                      <span className="font-medium">供需评估：</span>
+                      {fundamentalData.supply_demand.summary}
+                    </p>
+                  </div>
+                )}
+              </div>
+              
+              {/* 季节性规律 */}
+              <div className="mb-8">
+                <h3 className="text-base font-medium text-gray-900 mb-4 flex items-center">
+                  <svg className="w-5 h-5 mr-2 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                  季节性规律
+                </h3>
+                {renderSeasonalPattern()}
+              </div>
+              
+              {/* 南美天气 */}
+              <div className="mb-8">
+                <h3 className="text-base font-medium text-gray-900 mb-4 flex items-center">
+                  <svg className="w-5 h-5 mr-2 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z" />
+                  </svg>
+                  南美天气状况
+                </h3>
+                {renderWeatherConditions()}
+                {fundamentalData?.weather && (
+                  <div className="mt-4 p-3 border border-yellow-100 rounded-lg bg-yellow-50">
+                    <p className="text-sm text-gray-700">
+                      <span className="font-medium">天气影响评估：</span>
+                      {fundamentalData.weather.summary}
+                    </p>
+                  </div>
+                )}
+              </div>
+              
+              {/* 加工利润 */}
+              <div className="mb-8">
+                <h3 className="text-base font-medium text-gray-900 mb-4 flex items-center">
+                  <svg className="w-5 h-5 mr-2 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  豆粕压榨利润
+                </h3>
+                {renderCrushProfit()}
+                {fundamentalData?.crush_profit && (
+                  <div className="mt-4 p-3 border border-red-100 rounded-lg bg-red-50">
+                    <p className="text-sm text-gray-700">
+                      <span className="font-medium">压榨利润评估：</span>
+                      {fundamentalData.crush_profit.summary}
+                    </p>
+                  </div>
+                )}
+              </div>
+              
+              {/* 基本面综合评估 */}
+              <div>
+                <h3 className="text-base font-medium text-gray-900 mb-4 flex items-center">
+                  <svg className="w-5 h-5 mr-2 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                  </svg>
+                  基本面综合评估
+                </h3>
+                {renderOverallAssessment()}
+              </div>
+            </>
+          )}
         </div>
       </div>
 

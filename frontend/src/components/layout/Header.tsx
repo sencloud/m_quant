@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link, NavLink } from 'react-router-dom';
 import { Dropdown, Modal } from 'antd';
-import { DownOutlined, CrownOutlined, HistoryOutlined, LineChartOutlined, HeartOutlined } from '@ant-design/icons';
+import { DownOutlined, CrownOutlined, HistoryOutlined, LineChartOutlined, HeartOutlined, BarChartOutlined, FundOutlined } from '@ant-design/icons';
 
 const Header: React.FC = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -42,6 +42,46 @@ const Header: React.FC = () => {
     }
   ];
 
+  // 研究报告子菜单项
+  const researchMenuItems = [
+    {
+      key: 'strategy-advice',
+      label: (
+        <Link to="/research/strategy-advice" className="flex items-center py-2 px-4 hover:bg-gray-50">
+          <BarChartOutlined className="mr-3 text-blue-500" />
+          <div>
+            <div className="font-medium">交易策略建议</div>
+            <div className="text-xs text-gray-500">基于市场数据的交易策略分析和建议</div>
+          </div>
+        </Link>
+      ),
+    },
+    {
+      key: 'core-factor',
+      label: (
+        <Link to="/research/core-factor" className="flex items-center py-2 px-4 hover:bg-gray-50">
+          <LineChartOutlined className="mr-3 text-green-500" />
+          <div>
+            <div className="font-medium">核心驱动因子分析</div>
+            <div className="text-xs text-gray-500">豆粕市场核心驱动因子的深度分析</div>
+          </div>
+        </Link>
+      ),
+    },
+    {
+      key: 'options-strategy',
+      label: (
+        <Link to="/research/options-strategy" className="flex items-center py-2 px-4 hover:bg-gray-50">
+          <FundOutlined className="mr-3 text-purple-500" />
+          <div>
+            <div className="font-medium">期权策略分析</div>
+            <div className="text-xs text-gray-500">基于基本面的豆粕期权策略分析</div>
+          </div>
+        </Link>
+      ),
+    }
+  ];
+
   // 显示捐助弹窗
   const showDonateModal = () => {
     setIsDonateModalVisible(true);
@@ -62,25 +102,26 @@ const Header: React.FC = () => {
               <img src="/logo.png" alt="Logo" className="h-12 w-auto mr-3" />
               <div className="flex flex-col">
                 <span className="text-2xl font-bold text-gray-900">豆粕组合策略</span>
-                <span className="text-sm text-gray-500">豆粕ETF、期货、期权</span>
+                <span className="text-sm text-gray-500">豆粕ETF、期货、期权及相关股票</span>
               </div>
             </Link>
           </div>
 
           {/* Desktop Navigation */}
           <nav className="hidden md:flex space-x-8">
-            {/* <NavLink to="/market" className={getNavLinkClass}>
-              市场数据
-            </NavLink>
-            <NavLink to="/analysis" className={getNavLinkClass}>
-              技术分析
-            </NavLink> */}
             <NavLink to="/trading" className={getNavLinkClass}>
               交易策略
             </NavLink>
-            <NavLink to="/research" className={getNavLinkClass}>
-              研究报告
-            </NavLink>
+            <Dropdown 
+              menu={{ items: researchMenuItems }} 
+              placement="bottomRight"
+              overlayClassName="research-dropdown"
+              trigger={['hover']}
+            >
+              <a className="relative inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 hover:text-gray-900">
+                研究报告
+              </a>
+            </Dropdown>
             <Dropdown 
               menu={{ items: proMenuItems }} 
               placement="bottomRight"
@@ -94,7 +135,6 @@ const Header: React.FC = () => {
                     PRO
                   </span>
                 </span>
-                <DownOutlined className="ml-1" />
               </a>
             </Dropdown>
             <a 
@@ -137,13 +177,44 @@ const Header: React.FC = () => {
           >
             交易策略
           </NavLink>
-          <NavLink
-            to="/research"
-            className={getNavLinkClass}
-            onClick={() => setIsMenuOpen(false)}
-          >
-            研究报告
-          </NavLink>
+          <div className="px-3 py-2">
+            <div className="text-gray-700 font-medium">研究报告</div>
+            <div className="mt-2 space-y-1">
+              <NavLink
+                to="/research/strategy-advice"
+                className="flex items-center py-2 px-4 hover:bg-gray-50 rounded-md"
+                onClick={() => setIsMenuOpen(false)}
+              >
+                <BarChartOutlined className="mr-3 text-blue-500" />
+                <div>
+                  <div className="font-medium">交易策略建议</div>
+                  <div className="text-xs text-gray-500">基于市场数据的交易策略分析和建议</div>
+                </div>
+              </NavLink>
+              <NavLink
+                to="/research/core-factor"
+                className="flex items-center py-2 px-4 hover:bg-gray-50 rounded-md"
+                onClick={() => setIsMenuOpen(false)}
+              >
+                <LineChartOutlined className="mr-3 text-green-500" />
+                <div>
+                  <div className="font-medium">核心驱动因子分析</div>
+                  <div className="text-xs text-gray-500">豆粕市场核心驱动因子的深度分析</div>
+                </div>
+              </NavLink>
+              <NavLink
+                to="/research/options-strategy"
+                className="flex items-center py-2 px-4 hover:bg-gray-50 rounded-md"
+                onClick={() => setIsMenuOpen(false)}
+              >
+                <FundOutlined className="mr-3 text-purple-500" />
+                <div>
+                  <div className="font-medium">期权策略分析</div>
+                  <div className="text-xs text-gray-500">基于基本面的豆粕期权策略分析</div>
+                </div>
+              </NavLink>
+            </div>
+          </div>
           <div className="px-3 py-2">
             <div className="relative inline-block">
               <span className="text-gray-700 font-medium">专业版</span>

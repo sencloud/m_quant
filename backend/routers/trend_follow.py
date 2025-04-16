@@ -77,14 +77,14 @@ def load_and_process_data(file_path, is_15min=False):
 @router.get("/15min")
 async def get_15min_data():
     logger.info("收到15分钟数据请求")
-    data_path = Path("data/M2505.DCE_future_15min_20240101_20251231.csv")
+    data_path = Path("data/M2501.DCE_future_15min_20240101_20251231.csv")
     logger.debug(f"15分钟数据文件路径: {data_path.absolute()}")
     return load_and_process_data(data_path, is_15min=True)
 
 @router.get("/60min")
 async def get_60min_data():
     logger.info("收到60分钟数据请求")
-    data_path = Path("data/M2505.DCE_future_60min_20240101_20251231.csv")
+    data_path = Path("data/M2501.DCE_future_60min_20240101_20251231.csv")
     logger.debug(f"60分钟数据文件路径: {data_path.absolute()}")
     return load_and_process_data(data_path, is_15min=False)
 
@@ -95,8 +95,8 @@ async def backtest_strategy():
         logger.info("收到回测请求")
         
         # 加载数据
-        data_path_15min = Path("data/M2505.DCE_future_15min_20240101_20251231.csv")
-        data_path_60min = Path("data/M2505.DCE_future_60min_20240101_20251231.csv")
+        data_path_15min = Path("data/M2501.DCE_future_15min_20240101_20251231.csv")
+        data_path_60min = Path("data/M2501.DCE_future_60min_20240101_20251231.csv")
         
         # 读取并处理数据
         df_15min = pd.read_csv(data_path_15min)
