@@ -31,7 +31,7 @@ def call_llm(
     Returns:
         An instance of the specified Pydantic model
     """
-    from llm.models import get_model, get_model_info
+    from AI.llm.models import get_model, get_model_info
     
     model_info = get_model_info(model_name)
     llm = get_model(model_name, model_provider)

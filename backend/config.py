@@ -7,6 +7,9 @@ class Settings(BaseSettings):
     
     # Deepseek API配置
     DEEPSEEK_API_KEY: str
+
+    OPENAI_API_KEY: str
+    OPENAI_BASE_URL: str
     
     # 应用配置
     PROJECT_NAME: str = "豆粕组合策略"

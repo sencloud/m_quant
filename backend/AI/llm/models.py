@@ -5,14 +5,11 @@ from langchain_ollama import ChatOllama
 from enum import Enum
 from pydantic import BaseModel
 from typing import Tuple, List, Dict, Any, Optional
-
+from config import settings
 
 class ModelProvider(str, Enum):
     """Enum for supported LLM providers"""
-    ANTHROPIC = "Anthropic"
     DEEPSEEK = "DeepSeek"
-    GEMINI = "Gemini"
-    GROQ = "Groq"
     OPENAI = "OpenAI"
     OLLAMA = "Ollama"
 
@@ -57,16 +54,6 @@ AVAILABLE_MODELS = [
         display_name="[deepseek] deepseek-v3",
         model_name="deepseek-chat",
         provider=ModelProvider.DEEPSEEK
-    ),
-    LLMModel(
-        display_name="[groq] llama-4-scout-17b",
-        model_name="meta-llama/llama-4-scout-17b-16e-instruct",
-        provider=ModelProvider.GROQ
-    ),
-    LLMModel(
-        display_name="[groq] llama-4-maverick-17b",
-        model_name="meta-llama/llama-4-maverick-17b-128e-instruct",
-        provider=ModelProvider.GROQ
     ),
     LLMModel(
         display_name="[openai] gpt-4.5",
@@ -148,14 +135,15 @@ def get_model_info(model_name: str) -> LLMModel | None:
 def get_model(model_name: str, model_provider: ModelProvider) -> ChatOpenAI | ChatOllama | None:
     if model_provider == ModelProvider.OPENAI:
         # Get and validate API key
-        api_key = os.getenv("OPENAI_API_KEY")
+        api_key = settings.OPENAI_API_KEY
         if not api_key:
             # Print error to console
             print(f"API Key Error: Please make sure OPENAI_API_KEY is set in your .env file.")
             raise ValueError("OpenAI API key not found.  Please make sure OPENAI_API_KEY is set in your .env file.")
-        return ChatOpenAI(model=model_name, api_key=api_key)
+        base_url = settings.OPENAI_BASE_URL
+        return ChatOpenAI(model=model_name, api_key=api_key, base_url=base_url)
     elif model_provider == ModelProvider.DEEPSEEK:
-        api_key = os.getenv("DEEPSEEK_API_KEY")
+        api_key = settings.DEEPSEEK_API_KEY
         if not api_key:
             print(f"API Key Error: Please make sure DEEPSEEK_API_KEY is set in your .env file.")
             raise ValueError("DeepSeek API key not found.  Please make sure DEEPSEEK_API_KEY is set in your .env file.")

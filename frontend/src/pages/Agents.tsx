@@ -310,12 +310,12 @@ const Agents: React.FC = () => {
     setLoading(true);
     try {
       const request = {
-        tickers: ['M2409'], // 豆粕期货主力合约
+        tickers: ['000333'], // 豆粕期货主力合约
         start_date: startDate.toISOString().split('T')[0],
         end_date: endDate.toISOString().split('T')[0],
         initial_capital: 100000,
         portfolio: portfolioConfig,
-        selected_analysts: ['ben_graham', 'warren_buffett', 'bill_ackman'],
+        selected_analysts: ['ben_graham'],
         model_name: 'bot-20250329163710-8zcqm',
         model_provider: 'OpenAI'
       };

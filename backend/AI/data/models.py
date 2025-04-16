@@ -70,7 +70,19 @@ class LineItem(BaseModel):
     report_period: str
     period: str
     currency: str
-
+    revenue: float | None = None
+    earnings_per_share: float | None = None
+    net_income: float | None = None
+    free_cash_flow: float | None = None
+    operating_margin: float | None = None
+    depreciation_and_amortization: float | None = None
+    total_assets: float | None = None
+    total_liabilities: float | None = None
+    current_assets: float | None = None
+    current_liabilities: float | None = None
+    book_value_per_share: float | None = None
+    dividends_and_other_cash_distributions: float | None = None
+    outstanding_shares: float | None = None
     # Allow additional fields dynamically
     model_config = {"extra": "allow"}
 
