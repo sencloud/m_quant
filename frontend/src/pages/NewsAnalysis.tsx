@@ -1,10 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import axios from 'axios';
 import { API_ENDPOINTS } from '../config/api';
 import Layout from '../components/layout/Layout';
-import { Card, Tabs, List, Tag, Skeleton, DatePicker, Space, Typography, Table, Button } from 'antd';
-import { LineChartOutlined, HistoryOutlined } from '@ant-design/icons';
+import { Card, Tabs, List, Tag, Skeleton, DatePicker, Space, Typography, Table, Button, Row, Col, Statistic } from 'antd';
+import { LineChartOutlined, HistoryOutlined, PieChartOutlined, BarChartOutlined } from '@ant-design/icons';
 import ReactECharts from 'echarts-for-react';
 import * as echarts from 'echarts';
 import dayjs from 'dayjs';
@@ -32,6 +32,11 @@ interface NewsAnalysis {
     analysis: string;
   }[];
 }
+
+// 定义类型
+type ImportanceType = '高' | '中' | '低';
+type SentimentType = '利多' | '利空' | '中性';
+type ImpactLevelType = '强' | '中' | '弱';
 
 const NewsAnalysis: React.FC = () => {
   const [activeTab, setActiveTab] = useState('1');
@@ -78,6 +83,194 @@ const NewsAnalysis: React.FC = () => {
     } finally {
       setIsAnalyzing(false);
     }
+  };
+
+  // 计算分析结果汇总数据
+  const analysisSummary = useMemo(() => {
+    if (!newsAnalysis || !newsAnalysis.analysis || newsAnalysis.analysis.length === 0) {
+      return null;
+    }
+
+    // 计算重要性分布
+    const importanceCount: Record<ImportanceType, number> = {
+      '高': 0,
+      '中': 0,
+      '低': 0
+    };
+
+    // 计算情感分布
+    const sentimentCount: Record<SentimentType, number> = {
+      '利多': 0,
+      '利空': 0,
+      '中性': 0
+    };
+
+    // 计算影响程度分布
+    const impactLevelCount: Record<ImpactLevelType, number> = {
+      '强': 0,
+      '中': 0,
+      '弱': 0
+    };
+
+    // 统计各分类数量
+    newsAnalysis.analysis.forEach(item => {
+      if (item.importance) {
+        const importance = item.importance as ImportanceType;
+        if (importance in importanceCount) {
+          importanceCount[importance] = (importanceCount[importance] || 0) + 1;
+        }
+      }
+      
+      if (item.sentiment) {
+        const sentiment = item.sentiment as SentimentType;
+        if (sentiment in sentimentCount) {
+          sentimentCount[sentiment] = (sentimentCount[sentiment] || 0) + 1;
+        }
+      }
+      
+      if (item.impact_level) {
+        const impactLevel = item.impact_level as ImpactLevelType;
+        if (impactLevel in impactLevelCount) {
+          impactLevelCount[impactLevel] = (impactLevelCount[impactLevel] || 0) + 1;
+        }
+      }
+    });
+
+    return {
+      importanceCount,
+      sentimentCount,
+      impactLevelCount,
+      totalNews: newsAnalysis.news_count
+    };
+  }, [newsAnalysis]);
+
+  // 渲染重要性饼图
+  const renderImportancePieChart = () => {
+    if (!analysisSummary) return null;
+
+    const option = {
+      title: {
+        text: '新闻重要性分布',
+        left: 'center'
+      },
+      tooltip: {
+        trigger: 'item',
+        formatter: '{a} <br/>{b}: {c} ({d}%)'
+      },
+      legend: {
+        orient: 'vertical',
+        left: 'left',
+        data: ['高', '中', '低']
+      },
+      series: [
+        {
+          name: '重要性',
+          type: 'pie',
+          radius: '50%',
+          data: [
+            { value: analysisSummary.importanceCount['高'], name: '高', itemStyle: { color: '#f5222d' } },
+            { value: analysisSummary.importanceCount['中'], name: '中', itemStyle: { color: '#faad14' } },
+            { value: analysisSummary.importanceCount['低'], name: '低', itemStyle: { color: '#1890ff' } }
+          ],
+          emphasis: {
+            itemStyle: {
+              shadowBlur: 10,
+              shadowOffsetX: 0,
+              shadowColor: 'rgba(0, 0, 0, 0.5)'
+            }
+          }
+        }
+      ]
+    };
+
+    return <ReactECharts option={option} style={{ height: '300px' }} />;
+  };
+
+  // 渲染情感分布柱状图
+  const renderSentimentBarChart = () => {
+    if (!analysisSummary) return null;
+
+    const option = {
+      title: {
+        text: '新闻情感分布',
+        left: 'center'
+      },
+      tooltip: {
+        trigger: 'axis',
+        axisPointer: {
+          type: 'shadow'
+        }
+      },
+      xAxis: {
+        type: 'category',
+        data: ['利多', '利空', '中性']
+      },
+      yAxis: {
+        type: 'value',
+        name: '数量'
+      },
+      series: [
+        {
+          name: '情感',
+          type: 'bar',
+          data: [
+            { value: analysisSummary.sentimentCount['利多'], itemStyle: { color: '#52c41a' } },
+            { value: analysisSummary.sentimentCount['利空'], itemStyle: { color: '#f5222d' } },
+            { value: analysisSummary.sentimentCount['中性'], itemStyle: { color: '#1890ff' } }
+          ],
+          label: {
+            show: true,
+            position: 'top'
+          }
+        }
+      ]
+    };
+
+    return <ReactECharts option={option} style={{ height: '300px' }} />;
+  };
+
+  // 渲染影响程度雷达图
+  const renderImpactRadarChart = () => {
+    if (!analysisSummary) return null;
+
+    const option = {
+      title: {
+        text: '影响程度分布',
+        left: 'center'
+      },
+      tooltip: {},
+      radar: {
+        indicator: [
+          { name: '强', max: analysisSummary.totalNews },
+          { name: '中', max: analysisSummary.totalNews },
+          { name: '弱', max: analysisSummary.totalNews }
+        ]
+      },
+      series: [
+        {
+          name: '影响程度',
+          type: 'radar',
+          data: [
+            {
+              value: [
+                analysisSummary.impactLevelCount['强'],
+                analysisSummary.impactLevelCount['中'],
+                analysisSummary.impactLevelCount['弱']
+              ],
+              name: '数量',
+              areaStyle: {
+                color: 'rgba(24, 144, 255, 0.3)'
+              },
+              lineStyle: {
+                color: '#1890ff'
+              }
+            }
+          ]
+        }
+      ]
+    };
+
+    return <ReactECharts option={option} style={{ height: '300px' }} />;
   };
 
   // 渲染新闻列表
@@ -135,6 +328,52 @@ const NewsAnalysis: React.FC = () => {
             分析
           </Button>
         </div>
+
+        {/* 分析结果汇总卡片 */}
+        {analysisSummary && (
+          <Card className="mb-6">
+            <Title level={4}>分析结果汇总</Title>
+            <Row gutter={16} className="mb-6">
+              <Col span={6}>
+                <Statistic title="新闻总数" value={analysisSummary.totalNews} />
+              </Col>
+              <Col span={6}>
+                <Statistic 
+                  title="重要新闻" 
+                  value={analysisSummary.importanceCount['高']} 
+                  valueStyle={{ color: '#f5222d' }}
+                />
+              </Col>
+              <Col span={6}>
+                <Statistic 
+                  title="利多新闻" 
+                  value={analysisSummary.sentimentCount['利多']} 
+                  valueStyle={{ color: '#52c41a' }}
+                />
+              </Col>
+              <Col span={6}>
+                <Statistic 
+                  title="强影响新闻" 
+                  value={analysisSummary.impactLevelCount['强']} 
+                  valueStyle={{ color: '#1890ff' }}
+                />
+              </Col>
+            </Row>
+            
+            <Row gutter={16}>
+              <Col span={8}>
+                {renderImportancePieChart()}
+              </Col>
+              <Col span={8}>
+                {renderSentimentBarChart()}
+              </Col>
+              <Col span={8}>
+                {renderImpactRadarChart()}
+              </Col>
+            </Row>
+          </Card>
+        )}
+
         <List
           dataSource={newsAnalysis.analysis}
           renderItem={(item) => (
