@@ -5,9 +5,9 @@ import axios from 'axios';
 import { API_ENDPOINTS } from '../config/api';
 
 const CoreFactorAnalysisPage: React.FC = () => {
-  const minDate = "2025-04-10";
+  const minDate = "2024-01-01";
   const today = new Date().toISOString().split('T')[0];
-  const initialDate = today < minDate ? minDate : today;
+  const initialDate = today;
   
   const [selectedDate, setSelectedDate] = useState<string>(initialDate);
   const [isLoading, setIsLoading] = useState(false);
@@ -17,9 +17,7 @@ const CoreFactorAnalysisPage: React.FC = () => {
   const fetchFactorData = async () => {
     setIsLoading(true);
     try {
-      const response = await axios.get(`${API_ENDPOINTS.analysis.coreFactor}`, {
-        params: { date: selectedDate }
-      });
+      const response = await axios.get(`${API_ENDPOINTS.analysis.coreFactor}/${selectedDate}`);
       setFactorData(response.data);
     } catch (error) {
       console.error('获取核心驱动因子数据失败:', error);

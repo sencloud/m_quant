@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import Layout from '../components/layout/Layout';
-import { Card, Row, Col, Avatar, Typography, Tabs, Button, Modal, Spin, Divider, Statistic, Progress } from 'antd';
+import { Card, Row, Col, Avatar, Typography, Tabs, Button, Modal, Spin, Divider, Statistic, Progress, DatePicker, message } from 'antd';
 import { 
   UserOutlined, 
   BarChartOutlined, 
@@ -9,10 +9,13 @@ import {
   ArrowUpOutlined, 
   ArrowDownOutlined,
   InfoCircleOutlined,
-  TeamOutlined
+  TeamOutlined,
+  HistoryOutlined,
+  CalendarOutlined
 } from '@ant-design/icons';
 import * as echarts from 'echarts';
 import { ChevronDownIcon } from '@heroicons/react/24/outline';
+import { runBacktest } from '../api/ai';
 
 const { Title, Paragraph, Text } = Typography;
 const { TabPane } = Tabs;
@@ -201,8 +204,14 @@ const Agents: React.FC = () => {
   const [selectedExpert, setSelectedExpert] = useState<number | null>(null);
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [startDate, setStartDate] = useState<Date | null>(null);
+  const [endDate, setEndDate] = useState<Date | null>(null);
+  const [activeTab, setActiveTab] = useState<string>('1');
+  const [showAnalysis, setShowAnalysis] = useState<boolean>(false);
+  const [showBacktest, setShowBacktest] = useState<boolean>(false);
   const chartRef = React.useRef<HTMLDivElement>(null);
   const [chart, setChart] = useState<echarts.ECharts | null>(null);
+  const [performanceMetrics, setPerformanceMetrics] = useState<any>(null);
 
   useEffect(() => {
     if (chartRef.current) {
@@ -292,6 +301,104 @@ const Agents: React.FC = () => {
 
   const selectedExpertData = experts.find(expert => expert.id === selectedExpert);
 
+  const handleBacktest = async () => {
+    if (!startDate || !endDate) {
+      message.error('请选择开始和结束日期');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const request = {
+        tickers: ['M2409'], // 豆粕期货主力合约
+        start_date: startDate.toISOString().split('T')[0],
+        end_date: endDate.toISOString().split('T')[0],
+        initial_capital: 100000,
+        portfolio: portfolioConfig,
+        selected_analysts: ['ben_graham', 'warren_buffett', 'bill_ackman'],
+        model_name: 'bot-20250329163710-8zcqm',
+        model_provider: 'OpenAI'
+      };
+
+      const response = await runBacktest(request);
+      
+      // Update chart data
+      if (chart) {
+        const option = {
+          tooltip: {
+            trigger: 'axis',
+            formatter: '{b}: {c}'
+          },
+          grid: {
+            left: '3%',
+            right: '4%',
+            bottom: '3%',
+            containLabel: true
+          },
+          xAxis: {
+            type: 'category',
+            boundaryGap: false,
+            data: response.backtest.portfolio_values.map((_, index) => {
+              const date = new Date(startDate);
+              date.setDate(date.getDate() + index);
+              return date.toISOString().split('T')[0];
+            })
+          },
+          yAxis: {
+            type: 'value'
+          },
+          series: [
+            {
+              name: '组合价值',
+              type: 'line',
+              smooth: true,
+              data: response.backtest.portfolio_values,
+              areaStyle: {
+                opacity: 0.3,
+                color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                  {
+                    offset: 0,
+                    color: 'rgba(24, 144, 255, 0.8)'
+                  },
+                  {
+                    offset: 1,
+                    color: 'rgba(24, 144, 255, 0.1)'
+                  }
+                ])
+              },
+              lineStyle: {
+                width: 2
+              },
+              itemStyle: {
+                color: '#1890ff'
+              }
+            }
+          ]
+        };
+        
+        chart.setOption(option);
+      }
+
+      // Update performance metrics
+      setPerformanceMetrics(response.backtest.performance_metrics);
+      
+      setShowBacktest(true);
+      setShowAnalysis(false);
+      setActiveTab('1');
+    } catch (error) {
+      console.error('Error running backtest:', error);
+      message.error('回测分析失败，请重试');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAnalyzeToday = () => {
+    setShowAnalysis(true);
+    setShowBacktest(false);
+    setActiveTab('1');
+  };
+
   return (
     <Layout>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
@@ -347,112 +454,191 @@ const Agents: React.FC = () => {
           ]}
           icon={<FundOutlined />}
         >
-          <Tabs defaultActiveKey="1">
-            <TabPane tab="组合配置" key="1">
-              <Row gutter={[24, 24]}>
-                <Col xs={24} md={12}>
-                  <Title level={4}>资产配置</Title>
-                  <div className="mb-6">
-                    {Object.entries(portfolioConfig).map(([asset, percentage]) => (
-                      <div key={asset} className="mb-4">
-                        <div className="flex justify-between mb-1">
-                          <Text>{asset}</Text>
-                          <Text strong>{percentage}%</Text>
-                        </div>
-                        <Progress percent={percentage} strokeColor="#1890ff" />
+          <div className="mb-8">
+            <Row gutter={[16, 16]} align="middle">
+              <Col xs={24} sm={12} md={8}>
+                <div className="flex flex-col">
+                  <Text className="mb-2 text-gray-600">开始日期</Text>
+                  <DatePicker
+                    className="w-full"
+                    placeholder="选择开始日期"
+                    onChange={(date) => setStartDate(date?.toDate() || null)}
+                  />
+                </div>
+              </Col>
+              <Col xs={24} sm={12} md={8}>
+                <div className="flex flex-col">
+                  <Text className="mb-2 text-gray-600">结束日期</Text>
+                  <DatePicker
+                    className="w-full"
+                    placeholder="选择结束日期"
+                    onChange={(date) => setEndDate(date?.toDate() || null)}
+                  />
+                </div>
+              </Col>
+              <Col xs={24} sm={24} md={8}>
+                <Row gutter={8}>
+                  <Col span={12}>
+                    <Button 
+                      type="primary" 
+                      icon={<HistoryOutlined />}
+                      onClick={handleBacktest}
+                      className="w-full h-10"
+                      disabled={!startDate || !endDate}
+                    >
+                      回测分析
+                    </Button>
+                  </Col>
+                  <Col span={12}>
+                    <Button 
+                      type="primary" 
+                      icon={<CalendarOutlined />}
+                      onClick={handleAnalyzeToday}
+                      className="w-full h-10"
+                    >
+                      分析今日
+                    </Button>
+                  </Col>
+                </Row>
+              </Col>
+            </Row>
+          </div>
+
+          {showBacktest && (
+            <div className="bg-white rounded-lg p-6">
+              <Tabs activeKey={activeTab} onChange={setActiveTab}>
+                <TabPane tab="回测结果" key="1">
+                  <Row gutter={[24, 24]}>
+                    <Col xs={24} md={12}>
+                      <Title level={4}>资产配置</Title>
+                      <div className="mb-6">
+                        {Object.entries(portfolioConfig).map(([asset, percentage]) => (
+                          <div key={asset} className="mb-4">
+                            <div className="flex justify-between mb-1">
+                              <Text>{asset}</Text>
+                              <Text strong>{percentage}%</Text>
+                            </div>
+                            <Progress percent={percentage} strokeColor="#1890ff" />
+                          </div>
+                        ))}
                       </div>
-                    ))}
-                  </div>
-                  <div className="bg-gray-50 p-4 rounded-lg">
-                    <Title level={5}>组合特点</Title>
-                    <ul className="list-disc pl-5">
-                      <li>以豆粕期货为核心，占比40%</li>
+                    </Col>
+                    <Col xs={24} md={12}>
+                      <Title level={4}>历史回测</Title>
+                      <div ref={chartRef} className="h-64"></div>
+                      <div className="mt-4 grid grid-cols-2 gap-4">
+                        <Statistic 
+                          title="年化收益率" 
+                          value={performanceMetrics?.annual_return} 
+                          precision={2} 
+                          suffix="%" 
+                          valueStyle={{ color: '#3f8600' }}
+                          prefix={<ArrowUpOutlined />}
+                        />
+                        <Statistic 
+                          title="最大回撤" 
+                          value={performanceMetrics?.max_drawdown} 
+                          precision={2} 
+                          suffix="%" 
+                          valueStyle={{ color: '#cf1322' }}
+                          prefix={<ArrowDownOutlined />}
+                        />
+                        <Statistic 
+                          title="夏普比率" 
+                          value={performanceMetrics?.sharpe_ratio} 
+                          precision={2}
+                        />
+                        <Statistic 
+                          title="波动率" 
+                          value={performanceMetrics?.volatility} 
+                          precision={2} 
+                          suffix="%"
+                        />
+                      </div>
+                    </Col>
+                  </Row>
+                </TabPane>
+              </Tabs>
+            </div>
+          )}
+
+          {showAnalysis && (
+            <div className="bg-white rounded-lg p-6">
+              <Tabs activeKey={activeTab} onChange={setActiveTab}>
+                <TabPane tab="组合配置" key="1">
+                  <Row gutter={[24, 24]}>
+                    <Col xs={24} md={12}>
+                      <Title level={4}>资产配置</Title>
+                      <div className="mb-6">
+                        {Object.entries(portfolioConfig).map(([asset, percentage]) => (
+                          <div key={asset} className="mb-4">
+                            <div className="flex justify-between mb-1">
+                              <Text>{asset}</Text>
+                              <Text strong>{percentage}%</Text>
+                            </div>
+                            <Progress percent={percentage} strokeColor="#1890ff" />
+                          </div>
+                        ))}
+                      </div>
+                      <div className="bg-gray-50 p-4 rounded-lg">
+                        <Title level={5}>组合特点</Title>
+                        <ul className="list-disc pl-5">
+                          <li>以豆粕期货为核心，占比40%</li>
+                          <li>通过农业股票ETF分散风险，占比30%</li>
+                          <li>配置农业科技股票捕捉创新机会，占比20%</li>
+                          <li>使用豆粕期权进行风险对冲，占比10%</li>
+                        </ul>
+                      </div>
+                    </Col>
+                  </Row>
+                </TabPane>
+                <TabPane tab="专家共识" key="2">
+                  <div className="bg-gray-50 p-6 rounded-lg">
+                    <Title level={4} className="mb-4">专家共识分析</Title>
+                    <Paragraph>
+                      基于9位金融专家的分析，我们对豆粕市场形成以下共识：
+                    </Paragraph>
+                    <ul className="list-disc pl-5 mb-6">
+                      <li>长期供需关系支持豆粕价格上行</li>
+                      <li>农业科技革命将改变豆粕供应链</li>
+                      <li>全球通胀预期上升有利于商品价格</li>
+                      <li>行业整合将带来结构性机会</li>
+                    </ul>
+                    <Divider />
+                    <Title level={5} className="mb-4">投资建议</Title>
+                    <Paragraph>
+                      综合考虑各位专家的观点，我们建议：
+                    </Paragraph>
+                    <ol className="list-decimal pl-5">
+                      <li>核心配置豆粕期货，占比40%</li>
                       <li>通过农业股票ETF分散风险，占比30%</li>
                       <li>配置农业科技股票捕捉创新机会，占比20%</li>
                       <li>使用豆粕期权进行风险对冲，占比10%</li>
+                    </ol>
+                  </div>
+                </TabPane>
+                <TabPane tab="风险提示" key="3">
+                  <div className="bg-gray-50 p-6 rounded-lg">
+                    <Title level={4} className="mb-4">风险因素</Title>
+                    <ul className="list-disc pl-5 mb-6">
+                      <li>全球宏观经济波动可能导致商品价格剧烈波动</li>
+                      <li>天气因素对农产品产量有重大影响</li>
+                      <li>政策变化可能影响豆粕需求和价格</li>
+                      <li>期权策略存在时间衰减风险</li>
                     </ul>
+                    <Divider />
+                    <Title level={5} className="mb-4">风险控制措施</Title>
+                    <ol className="list-decimal pl-5">
+                      <li>通过多元化配置降低单一资产风险</li>
+                      <li>使用期权策略对冲下行风险</li>
+                      <li>设置止损位控制最大回撤</li>
+                      <li>定期再平衡维持目标配置比例</li>
+                    </ol>
                   </div>
-                </Col>
-                <Col xs={24} md={12}>
-                  <Title level={4}>历史回测</Title>
-                  <div ref={chartRef} className="h-64"></div>
-                  <div className="mt-4 grid grid-cols-2 gap-4">
-                    <Statistic 
-                      title="年化收益率" 
-                      value={15.8} 
-                      precision={2} 
-                      suffix="%" 
-                      valueStyle={{ color: '#3f8600' }}
-                      prefix={<ArrowUpOutlined />}
-                    />
-                    <Statistic 
-                      title="最大回撤" 
-                      value={8.5} 
-                      precision={2} 
-                      suffix="%" 
-                      valueStyle={{ color: '#cf1322' }}
-                      prefix={<ArrowDownOutlined />}
-                    />
-                    <Statistic 
-                      title="夏普比率" 
-                      value={1.2} 
-                      precision={2}
-                    />
-                    <Statistic 
-                      title="波动率" 
-                      value={12.3} 
-                      precision={2} 
-                      suffix="%"
-                    />
-                  </div>
-                </Col>
-              </Row>
-            </TabPane>
-            <TabPane tab="专家共识" key="2">
-              <div className="bg-gray-50 p-6 rounded-lg">
-                <Title level={4} className="mb-4">专家共识分析</Title>
-                <Paragraph>
-                  基于9位金融专家的分析，我们对豆粕市场形成以下共识：
-                </Paragraph>
-                <ul className="list-disc pl-5 mb-6">
-                  <li>长期供需关系支持豆粕价格上行</li>
-                  <li>农业科技革命将改变豆粕供应链</li>
-                  <li>全球通胀预期上升有利于商品价格</li>
-                  <li>行业整合将带来结构性机会</li>
-                </ul>
-                <Divider />
-                <Title level={5} className="mb-4">投资建议</Title>
-                <Paragraph>
-                  综合考虑各位专家的观点，我们建议：
-                </Paragraph>
-                <ol className="list-decimal pl-5">
-                  <li>核心配置豆粕期货，占比40%</li>
-                  <li>通过农业股票ETF分散风险，占比30%</li>
-                  <li>配置农业科技股票捕捉创新机会，占比20%</li>
-                  <li>使用豆粕期权进行风险对冲，占比10%</li>
-                </ol>
-              </div>
-            </TabPane>
-            <TabPane tab="风险提示" key="3">
-              <div className="bg-gray-50 p-6 rounded-lg">
-                <Title level={4} className="mb-4">风险因素</Title>
-                <ul className="list-disc pl-5 mb-6">
-                  <li>全球宏观经济波动可能导致商品价格剧烈波动</li>
-                  <li>天气因素对农产品产量有重大影响</li>
-                  <li>政策变化可能影响豆粕需求和价格</li>
-                  <li>期权策略存在时间衰减风险</li>
-                </ul>
-                <Divider />
-                <Title level={5} className="mb-4">风险控制措施</Title>
-                <ol className="list-decimal pl-5">
-                  <li>通过多元化配置降低单一资产风险</li>
-                  <li>使用期权策略对冲下行风险</li>
-                  <li>设置止损位控制最大回撤</li>
-                  <li>定期再平衡维持目标配置比例</li>
-                </ol>
-              </div>
-            </TabPane>
-          </Tabs>
+                </TabPane>
+              </Tabs>
+            </div>
+          )}
         </StrategyCard>
 
         {/* 专家详情弹窗 */}
