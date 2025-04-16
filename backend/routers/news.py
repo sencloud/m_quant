@@ -57,8 +57,28 @@ async def get_news_analysis(
     try:
         analysis = service.analyze_news_impact(news_date)
         if not analysis:
-            raise HTTPException(status_code=404, detail="未找到新闻分析数据")
+            return {
+                "date": news_date,
+                "news_count": 0,
+                "price_change": None,
+                "volume_change": None,
+                "analysis": [],
+                "message": "未找到该日期的新闻数据"
+            }
         return analysis
     except Exception as e:
         logger.error(f"获取新闻分析失败: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/analyze")
+async def analyze_news(
+    news_date: str = Query(..., description="新闻日期，格式：YYYYMMDD"),
+    service: NewsService = Depends(get_news_service)
+):
+    """分析新闻"""
+    try:
+        analysis = await service.analyze_news_with_deepseek(news_date)
+        return analysis
+    except Exception as e:
+        logger.error(f"分析新闻失败: {e}")
         raise HTTPException(status_code=500, detail=str(e)) 

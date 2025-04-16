@@ -9,6 +9,8 @@ from sqlalchemy import create_engine, Column, Integer, String, DateTime, Text
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from models.news import FlashNews, NewsArticle
+import json
+from openai import OpenAI
 
 Base = declarative_base()
 
@@ -334,26 +336,38 @@ class NewsService:
             # 转换日期格式
             start_date = datetime.strptime(news_date, '%Y%m%d')
             end_date = start_date + timedelta(days=1)
+            
+            # 转换为字符串格式，用于数据库查询
+            start_date_str = start_date.strftime('%Y-%m-%d %H:%M:%S')
+            end_date_str = end_date.strftime('%Y-%m-%d %H:%M:%S')
+
+            logger.info(f"开始分析{start_date_str}到{end_date_str}的新闻影响")
                 
             # 从数据库获取指定日期的新闻数据
             db = self.SessionLocal()
             news_articles = db.query(NewsArticleDB).filter(
-                NewsArticleDB.datetime >= start_date,
-                NewsArticleDB.datetime < end_date
+                NewsArticleDB.datetime >= start_date_str,
+                NewsArticleDB.datetime < end_date_str
             ).order_by(NewsArticleDB.datetime.desc()).all()
             
+            # 如果当天没有数据，尝试获取前一天的数据
             if not news_articles:
-                logger.warning(f"未找到{news_date}的新闻数据")
-                return {}
+                logger.warning(f"未找到{news_date}的新闻数据，尝试获取前一天的数据")
+                start_date = start_date - timedelta(days=1)
+                end_date = end_date - timedelta(days=1)
+                start_date_str = start_date.strftime('%Y-%m-%d %H:%M:%S')
+                end_date_str = end_date.strftime('%Y-%m-%d %H:%M:%S')
+                news_articles = db.query(NewsArticleDB).filter(
+                    NewsArticleDB.datetime >= start_date_str,
+                    NewsArticleDB.datetime < end_date_str
+                ).order_by(NewsArticleDB.datetime.desc()).all()
                 
-            # 获取期货价格数据
-            if self.pro is None:
-                logger.error("Tushare API 未初始化，无法获取期货价格数据")
-                return {}
+                if not news_articles:
+                    logger.warning(f"未找到前一天{start_date.strftime('%Y%m%d')}的新闻数据")
+                    return {}
                 
-            futures_df = self.pro.fut_daily(trade_date=news_date)
-            if futures_df is None or futures_df.empty:
-                return {}
+                # 更新 news_date 为实际找到的日期
+                news_date = start_date.strftime('%Y%m%d')
                 
             # 分析新闻影响
             result = {
@@ -364,19 +378,23 @@ class NewsService:
                 'analysis': []
             }
             
-            # 计算价格变化
-            if len(futures_df) > 0:
-                result['price_change'] = futures_df['close'].iloc[0] - futures_df['open'].iloc[0]
-                result['volume_change'] = futures_df['vol'].iloc[0]
-                
             # 分析每条新闻
             for article in news_articles:
                 impact = {
                     'title': article.title,
                     'content': article.content,
                     'datetime': article.datetime.strftime('%Y-%m-%d %H:%M:%S'),
-                    'sentiment': 'positive' if result['price_change'] > 0 else 'negative' if result['price_change'] < 0 else 'neutral'
                 }
+                
+                # 解析analysis字段
+                if article.analysis:
+                    try:
+                        analysis_data = json.loads(article.analysis)
+                        impact.update(analysis_data)
+                    except json.JSONDecodeError as e:
+                        logger.error(f"解析analysis字段失败: {e}")
+                        impact['analysis_error'] = "解析分析结果失败"
+                
                 result['analysis'].append(impact)
                 
             logger.info(f"成功分析{news_date}的新闻影响，共{len(news_articles)}条新闻")
@@ -444,6 +462,178 @@ class NewsService:
         except Exception as e:
             logger.error(f"获取资讯文章数据失败: {e}")
             return []
+        finally:
+            if 'db' in locals():
+                db.close()
+
+    async def analyze_news_with_deepseek(self, news_date: str) -> Dict[str, Any]:
+        """使用DeepSeek分析新闻
+        
+        Args:
+            news_date: 新闻日期，格式：YYYYMMDD
+            
+        Returns:
+            分析结果
+        """
+        try:
+            if self.engine is None:
+                logger.error("数据库未初始化，无法分析新闻")
+                return {}
+                
+            # 转换日期格式
+            start_date = datetime.strptime(news_date, '%Y%m%d')
+            end_date = start_date + timedelta(days=1)
+            
+            # 转换为字符串格式，用于数据库查询
+            start_date_str = start_date.strftime('%Y-%m-%d %H:%M:%S')
+            end_date_str = end_date.strftime('%Y-%m-%d %H:%M:%S')
+                
+            # 从数据库获取指定日期的新闻数据
+            db = self.SessionLocal()
+            news_articles = db.query(NewsArticleDB).filter(
+                NewsArticleDB.datetime >= start_date_str,
+                NewsArticleDB.datetime < end_date_str
+            ).order_by(NewsArticleDB.datetime.desc()).all()
+            
+            if not news_articles:
+                logger.warning(f"未找到{news_date}的新闻数据")
+                return {
+                    "date": news_date,
+                    "news_count": 0,
+                    "analysis": [],
+                    "message": "未找到该日期的新闻数据"
+                }
+            
+            # 初始化OpenAI客户端
+            client = OpenAI(
+                api_key=settings.DEEPSEEK_API_KEY,
+                base_url="https://ark.cn-beijing.volces.com/api/v3/bots"
+            )
+            
+            # 分析每条新闻
+            analysis_results = []
+            for article in news_articles:
+                logger.info(f"开始分析新闻: {article.title}")
+                prompt = f"""请分析以下新闻对豆粕市场的影响：
+
+标题：{article.title}
+内容：{article.content}
+发布时间：{article.datetime.strftime('%Y-%m-%d %H:%M:%S')}
+
+请从以下几个方面进行分析：
+1. 新闻重要性（高/中/低）
+2. 对豆粕市场的影响（利多/利空/中性）
+3. 影响程度（强/中/弱）
+4. 具体分析
+
+请以JSON格式回答：
+{{
+    "importance": "高/中/低",
+    "sentiment": "利多/利空/中性",
+    "impact_level": "强/中/弱",
+    "analysis": "具体分析内容"
+}}"""
+                
+                try:
+                    response = client.chat.completions.create(
+                        model="bot-20250329163710-8zcqm",
+                        messages=[
+                            {"role": "system", "content": "你是一个豆粕市场分析专家"},
+                            {"role": "user", "content": prompt}
+                        ],
+                        stream=False
+                    )
+                    
+                    content = response.choices[0].message.content
+                    # 提取JSON内容
+                    if "```json" in content:
+                        json_content = content.split("```json")[1].split("```")[0].strip()
+                    else:
+                        json_content = content.strip()
+                    
+                    # 尝试提取JSON对象
+                    try:
+                        # 查找第一个{和最后一个}之间的内容
+                        start_idx = json_content.find('{')
+                        end_idx = json_content.rfind('}')
+                        if start_idx != -1 and end_idx != -1:
+                            json_content = json_content[start_idx:end_idx+1]
+                        
+                        # 处理reference字段，将[]格式转换为字符串
+                        if '"reference": [' in json_content:
+                            # 找到reference字段的开始位置
+                            ref_start = json_content.find('"reference": [')
+                            if ref_start != -1:
+                                # 找到对应的结束位置
+                                ref_end = json_content.find(']', ref_start)
+                                if ref_end != -1:
+                                    # 提取reference内容并转换为字符串
+                                    ref_content = json_content[ref_start:ref_end+1]
+                                    # 替换为字符串格式
+                                    json_content = json_content.replace(ref_content, '"reference": "参考来源"')
+                        
+                        analysis = json.loads(json_content)
+                        
+                        # 验证必要字段
+                        required_fields = ['importance', 'sentiment', 'impact_level', 'analysis']
+                        if not all(field in analysis for field in required_fields):
+                            logger.warning(f"分析结果缺少必要字段: {analysis}")
+                            # 添加默认值
+                            for field in required_fields:
+                                if field not in analysis:
+                                    analysis[field] = "未知"
+                        
+                        # 更新数据库中的分析结果
+                        logger.info(f"更新数据库中的分析结果: {analysis}")
+                        article.analysis = json.dumps(analysis, ensure_ascii=False)
+                        db.add(article)
+                        
+                        analysis_results.append({
+                            "title": article.title,
+                            "content": article.content,
+                            "datetime": article.datetime.strftime('%Y-%m-%d %H:%M:%S'),
+                            **analysis
+                        })
+                    except json.JSONDecodeError as e:
+                        logger.error(f"JSON解析失败: {e}, 内容: {json_content}")
+                        # 创建一个默认的分析结果
+                        default_analysis = {
+                            "importance": "未知",
+                            "sentiment": "未知",
+                            "impact_level": "未知",
+                            "analysis": "分析失败，请重试"
+                        }
+                        article.analysis = json.dumps(default_analysis, ensure_ascii=False)
+                        db.add(article)
+                        
+                        analysis_results.append({
+                            "title": article.title,
+                            "content": article.content,
+                            "datetime": article.datetime.strftime('%Y-%m-%d %H:%M:%S'),
+                            **default_analysis
+                        })
+                    
+                except Exception as e:
+                    logger.error(f"分析新闻失败: {e}")
+                    continue
+            
+            # 提交数据库更改
+            try:
+                db.commit()
+                logger.info(f"成功更新{len(analysis_results)}条新闻的分析结果到数据库")
+            except Exception as e:
+                logger.error(f"更新数据库失败: {e}")
+                db.rollback()
+            
+            return {
+                "date": news_date,
+                "news_count": len(news_articles),
+                "analysis": analysis_results
+            }
+            
+        except Exception as e:
+            logger.error(f"分析新闻失败: {e}")
+            return {}
         finally:
             if 'db' in locals():
                 db.close()

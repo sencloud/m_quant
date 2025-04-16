@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link, NavLink } from 'react-router-dom';
 import { Dropdown, Modal } from 'antd';
-import { DownOutlined, CrownOutlined, HistoryOutlined, LineChartOutlined, HeartOutlined, BarChartOutlined, FundOutlined } from '@ant-design/icons';
+import { DownOutlined, CrownOutlined, HistoryOutlined, LineChartOutlined, HeartOutlined, BarChartOutlined, FundOutlined, TeamOutlined } from '@ant-design/icons';
 
 const Header: React.FC = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -20,7 +20,7 @@ const Header: React.FC = () => {
       key: 'pro-analysis',
       label: (
         <Link to="/pro-analysis" className="flex items-center py-2 px-4 hover:bg-gray-50">
-          <HistoryOutlined className="mr-3 text-yellow-500" />
+          <HistoryOutlined className="mr-3 text-yellow-500 text-xl" />
           <div>
             <div className="font-medium">历史规律</div>
             <div className="text-xs text-gray-500">基于历史数据的深度分析</div>
@@ -32,10 +32,22 @@ const Header: React.FC = () => {
       key: 'news-analysis',
       label: (
         <Link to="/news-analysis" className="flex items-center py-2 px-4 hover:bg-gray-50">
-          <LineChartOutlined className="mr-3 text-yellow-500" />
+          <LineChartOutlined className="mr-3 text-yellow-500 text-xl" />
           <div>
             <div className="font-medium">消息面分析</div>
             <div className="text-xs text-gray-500">从宏观、行业等角度分析消息面</div>
+          </div>
+        </Link>
+      ),
+    },
+    {
+      key: 'agents',
+      label: (
+        <Link to="/agents" className="flex items-center py-2 px-4 hover:bg-gray-50">
+          <TeamOutlined className="mr-3 text-yellow-500 text-xl" />
+          <div>
+            <div className="font-medium">多智能体分析</div>
+            <div className="text-xs text-gray-500">金融专家智能体组合分析策略</div>
           </div>
         </Link>
       ),
@@ -48,7 +60,7 @@ const Header: React.FC = () => {
       key: 'strategy-advice',
       label: (
         <Link to="/research/strategy-advice" className="flex items-center py-2 px-4 hover:bg-gray-50">
-          <BarChartOutlined className="mr-3 text-blue-500" />
+          <BarChartOutlined className="mr-3 text-blue-500 text-xl" />
           <div>
             <div className="font-medium">交易策略建议</div>
             <div className="text-xs text-gray-500">基于市场数据的交易策略分析和建议</div>
@@ -60,7 +72,7 @@ const Header: React.FC = () => {
       key: 'core-factor',
       label: (
         <Link to="/research/core-factor" className="flex items-center py-2 px-4 hover:bg-gray-50">
-          <LineChartOutlined className="mr-3 text-green-500" />
+          <LineChartOutlined className="mr-3 text-green-500 text-xl" />
           <div>
             <div className="font-medium">核心驱动因子分析</div>
             <div className="text-xs text-gray-500">豆粕市场核心驱动因子的深度分析</div>
@@ -72,10 +84,10 @@ const Header: React.FC = () => {
       key: 'options-strategy',
       label: (
         <Link to="/research/options-strategy" className="flex items-center py-2 px-4 hover:bg-gray-50">
-          <FundOutlined className="mr-3 text-purple-500" />
+          <FundOutlined className="mr-3 text-purple-500 text-xl" />
           <div>
-            <div className="font-medium">期权策略分析</div>
-            <div className="text-xs text-gray-500">基于基本面的豆粕期权策略分析</div>
+            <div className="font-medium">基本面分析</div>
+            <div className="text-xs text-gray-500">基于基本面的豆粕策略分析</div>
           </div>
         </Link>
       ),
@@ -185,7 +197,7 @@ const Header: React.FC = () => {
                 className="flex items-center py-2 px-4 hover:bg-gray-50 rounded-md"
                 onClick={() => setIsMenuOpen(false)}
               >
-                <BarChartOutlined className="mr-3 text-blue-500" />
+                <BarChartOutlined className="mr-3 text-blue-500 text-xl" />
                 <div>
                   <div className="font-medium">交易策略建议</div>
                   <div className="text-xs text-gray-500">基于市场数据的交易策略分析和建议</div>
@@ -196,7 +208,7 @@ const Header: React.FC = () => {
                 className="flex items-center py-2 px-4 hover:bg-gray-50 rounded-md"
                 onClick={() => setIsMenuOpen(false)}
               >
-                <LineChartOutlined className="mr-3 text-green-500" />
+                <LineChartOutlined className="mr-3 text-green-500 text-xl" />
                 <div>
                   <div className="font-medium">核心驱动因子分析</div>
                   <div className="text-xs text-gray-500">豆粕市场核心驱动因子的深度分析</div>
@@ -207,10 +219,10 @@ const Header: React.FC = () => {
                 className="flex items-center py-2 px-4 hover:bg-gray-50 rounded-md"
                 onClick={() => setIsMenuOpen(false)}
               >
-                <FundOutlined className="mr-3 text-purple-500" />
+                <FundOutlined className="mr-3 text-purple-500 text-xl" />
                 <div>
-                  <div className="font-medium">期权策略分析</div>
-                  <div className="text-xs text-gray-500">基于基本面的豆粕期权策略分析</div>
+                  <div className="font-medium">基本面分析</div>
+                  <div className="text-xs text-gray-500">基于基本面的豆粕策略分析</div>
                 </div>
               </NavLink>
             </div>
@@ -228,7 +240,7 @@ const Header: React.FC = () => {
                 className="flex items-center py-2 px-4 hover:bg-gray-50 rounded-md"
                 onClick={() => setIsMenuOpen(false)}
               >
-                <HistoryOutlined className="mr-3 text-yellow-500" />
+                <HistoryOutlined className="mr-3 text-yellow-500 text-xl" />
                 <div>
                   <div className="font-medium">历史规律</div>
                   <div className="text-xs text-gray-500">基于历史数据的深度分析</div>
@@ -239,10 +251,21 @@ const Header: React.FC = () => {
                 className="flex items-center py-2 px-4 hover:bg-gray-50 rounded-md"
                 onClick={() => setIsMenuOpen(false)}
               >
-                <LineChartOutlined className="mr-3 text-yellow-500" />
+                <LineChartOutlined className="mr-3 text-yellow-500 text-xl" />
                 <div>
                   <div className="font-medium">消息面分析</div>
                   <div className="text-xs text-gray-500">从宏观、行业等角度分析消息面</div>
+                </div>
+              </NavLink>
+              <NavLink
+                to="/agents"
+                className="flex items-center py-2 px-4 hover:bg-gray-50 rounded-md"
+                onClick={() => setIsMenuOpen(false)}
+              >
+                <TeamOutlined className="mr-3 text-yellow-500 text-xl" />
+                <div>
+                  <div className="font-medium">多智能体分析</div>
+                  <div className="text-xs text-gray-500">金融专家智能体组合分析策略</div>
                 </div>
               </NavLink>
             </div>

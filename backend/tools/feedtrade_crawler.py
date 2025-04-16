@@ -139,6 +139,16 @@ class FeedTradeCrawler:
                 day = int(time_match.group(3))
                 date_obj = datetime(year, month, day)
                 logger.info(f"从文章内容提取到更新时间: {date_obj}")
+            else:
+                time_pattern = r'<div class="flex-auto !h-24px text-center">.*?(\d{4})年(\d{1,2})月(\d{1,2})日.*?</div>'
+                time_match = re.search(time_pattern, html, re.DOTALL)
+                
+                if time_match:
+                    year = int(time_match.group(1))
+                    month = int(time_match.group(2))
+                    day = int(time_match.group(3))
+                    date_obj = datetime(year, month, day)
+                    logger.info(f"从文章内容提取到时间: {date_obj}")
             
             result = {
                 'content': content,

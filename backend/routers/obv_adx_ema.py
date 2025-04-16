@@ -42,8 +42,6 @@ def load_and_process_data(file_path):
         df['obv'] = df['obv'].fillna(method='ffill').fillna(method='bfill')
         df['obv_ma30'] = df['obv_ma30'].fillna(method='ffill').fillna(method='bfill')
 
-        logger.info(f"数据: {df.to_string()}")
-        
         logger.debug(f"数据中是否还存在NaN值: {df.isna().any().any()}")
         
         # 按时间升序排序

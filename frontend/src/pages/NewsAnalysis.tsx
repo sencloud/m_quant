@@ -3,11 +3,12 @@ import { useQuery } from '@tanstack/react-query';
 import axios from 'axios';
 import { API_ENDPOINTS } from '../config/api';
 import Layout from '../components/layout/Layout';
-import { Card, Tabs, List, Tag, Skeleton, DatePicker, Space, Typography, Table } from 'antd';
+import { Card, Tabs, List, Tag, Skeleton, DatePicker, Space, Typography, Table, Button } from 'antd';
 import { LineChartOutlined, HistoryOutlined } from '@ant-design/icons';
 import ReactECharts from 'echarts-for-react';
 import * as echarts from 'echarts';
 import dayjs from 'dayjs';
+import ReactMarkdown from 'react-markdown';
 
 const { Title, Text } = Typography;
 
@@ -21,19 +22,21 @@ interface NewsItem {
 interface NewsAnalysis {
   date: string;
   news_count: number;
-  price_change: number;
-  volume_change: number;
   analysis: {
     title: string;
     content: string;
     datetime: string;
-    sentiment: 'positive' | 'negative' | 'neutral';
+    importance: string;
+    sentiment: string;
+    impact_level: string;
+    analysis: string;
   }[];
 }
 
 const NewsAnalysis: React.FC = () => {
   const [activeTab, setActiveTab] = useState('1');
   const [selectedDate, setSelectedDate] = useState<string>(dayjs().format('YYYYMMDD'));
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
 
   // 获取每日新闻
   const { data: dailyNews, isLoading: isLoadingNews } = useQuery<NewsItem[]>({
@@ -46,7 +49,7 @@ const NewsAnalysis: React.FC = () => {
   });
 
   // 获取新闻分析
-  const { data: newsAnalysis, isLoading: isLoadingAnalysis, error } = useQuery<NewsAnalysis>({
+  const { data: newsAnalysis, isLoading: isLoadingAnalysis, error, refetch } = useQuery<NewsAnalysis>({
     queryKey: ['newsAnalysis', selectedDate],
     queryFn: async () => {
       try {
@@ -62,67 +65,19 @@ const NewsAnalysis: React.FC = () => {
     refetchOnWindowFocus: false
   });
 
-  // 获取新闻分析图表配置
-  const getAnalysisChartOption = () => {
-    if (!newsAnalysis) return {};
-
-    return {
-      title: {
-        text: '新闻影响分析',
-        left: 'center'
-      },
-      tooltip: {
-        trigger: 'axis',
-        axisPointer: {
-          type: 'cross'
-        }
-      },
-      legend: {
-        data: ['价格变化', '成交量变化'],
-        top: 30
-      },
-      grid: {
-        left: '3%',
-        right: '4%',
-        bottom: '3%',
-        containLabel: true
-      },
-      xAxis: {
-        type: 'category',
-        data: [newsAnalysis.date]
-      },
-      yAxis: [
-        {
-          type: 'value',
-          name: '价格变化',
-          position: 'left'
-        },
-        {
-          type: 'value',
-          name: '成交量变化',
-          position: 'right'
-        }
-      ],
-      series: [
-        {
-          name: '价格变化',
-          type: 'bar',
-          data: [newsAnalysis.price_change],
-          itemStyle: {
-            color: newsAnalysis.price_change >= 0 ? '#f5222d' : '#52c41a'
-          }
-        },
-        {
-          name: '成交量变化',
-          type: 'line',
-          yAxisIndex: 1,
-          data: [newsAnalysis.volume_change],
-          itemStyle: {
-            color: '#1890ff'
-          }
-        }
-      ]
-    };
+  // 分析新闻
+  const handleAnalyze = async () => {
+    try {
+      setIsAnalyzing(true);
+      await axios.post(API_ENDPOINTS.news.analyze, null, {
+        params: { news_date: selectedDate }
+      });
+      await refetch();
+    } catch (error) {
+      console.error('分析新闻失败:', error);
+    } finally {
+      setIsAnalyzing(false);
+    }
   };
 
   // 渲染新闻列表
@@ -167,15 +122,19 @@ const NewsAnalysis: React.FC = () => {
 
     return (
       <div>
-        <div className="mb-4">
+        <div className="mb-4 flex items-center gap-4">
           <DatePicker
             value={dayjs(selectedDate)}
             onChange={(date) => setSelectedDate(date?.format('YYYYMMDD') || dayjs().format('YYYYMMDD'))}
           />
+          <Button 
+            type="primary" 
+            onClick={handleAnalyze} 
+            loading={isAnalyzing}
+          >
+            分析
+          </Button>
         </div>
-        <Card className="mb-4">
-          <ReactECharts option={getAnalysisChartOption()} style={{ height: '400px' }} />
-        </Card>
         <List
           dataSource={newsAnalysis.analysis}
           renderItem={(item) => (
@@ -185,14 +144,36 @@ const NewsAnalysis: React.FC = () => {
                   <div>
                     <Title level={5}>{item.title}</Title>
                     <Text type="secondary">{item.content}</Text>
+                    <div className="mt-2">
+                      <Text type="secondary">重要性：</Text>
+                      <Tag color={
+                        item.importance === '高' ? 'red' :
+                        item.importance === '中' ? 'orange' : 'blue'
+                      }>
+                        {item.importance}
+                      </Tag>
+                      <Text type="secondary" className="ml-4">影响：</Text>
+                      <Tag color={
+                        item.sentiment === '利多' ? 'success' :
+                        item.sentiment === '利空' ? 'error' : 'default'
+                      }>
+                        {item.sentiment}
+                      </Tag>
+                      <Text type="secondary" className="ml-4">程度：</Text>
+                      <Tag color={
+                        item.impact_level === '强' ? 'red' :
+                        item.impact_level === '中' ? 'orange' : 'blue'
+                      }>
+                        {item.impact_level}
+                      </Tag>
+                    </div>
+                    <div className="mt-2">
+                      <Text type="secondary">分析：</Text>
+                      <div className="prose prose-sm max-w-none">
+                        <ReactMarkdown>{item.analysis}</ReactMarkdown>
+                      </div>
+                    </div>
                   </div>
-                  <Tag color={
-                    item.sentiment === 'positive' ? 'success' :
-                    item.sentiment === 'negative' ? 'error' : 'default'
-                  }>
-                    {item.sentiment === 'positive' ? '利多' :
-                     item.sentiment === 'negative' ? '利空' : '中性'}
-                  </Tag>
                 </div>
               </Card>
             </List.Item>

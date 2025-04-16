@@ -43,6 +43,7 @@ export const API_ENDPOINTS = {
   },
   news: {
     daily: `${API_BASE_URL}/news/daily`,
-    analysis: `${API_BASE_URL}/news/analysis`
+    analysis: `${API_BASE_URL}/news/analysis`,
+    analyze: `${API_BASE_URL}/news/analyze`
   }
 }; 
