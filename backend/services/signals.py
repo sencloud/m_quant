@@ -11,6 +11,7 @@ import random
 from services.account import AccountService
 from services.position import PositionService
 from models.position import PositionCreate
+from config import get_multiplier, is_futures
 
 Base = declarative_base()
 
@@ -177,7 +178,7 @@ class SignalService:
             
             # 根据类型筛选
             if signal_type:
-                if signal_type in ['buy', 'sell']:
+                if signal_type in ['BUY_OPEN', 'SELL_OPEN', 'BUY_CLOSE', 'SELL_CLOSE']:
                     query = query.filter(SignalDB.type == signal_type)
                 elif signal_type in ['open', 'closed']:
                     query = query.filter(SignalDB.status == signal_type)
@@ -222,6 +223,8 @@ class SignalService:
     def calc_trade(self, signal: Signal) -> None:
         """计算交易盈亏并更新账户"""
         try:
+            self.logger.info(f"开始计算交易: {signal.id}, 类型: {signal.type}, 状态: {signal.status}")
+            
             # 获取账户信息
             account = self.account_service.get_account()
             if not account:
@@ -231,21 +234,30 @@ class SignalService:
             # 计算手续费 (假设手续费率为0.0003)
             commission_rate = 0.0003
             commission = signal.price * signal.quantity * commission_rate
+            self.logger.info(f"计算手续费: {commission}")
 
             # 计算交易金额
             trade_amount = signal.price * signal.quantity
+            self.logger.info(f"交易金额: {trade_amount}")
 
             # 获取持仓服务
             position_service = PositionService()
 
             # 获取该品种的持仓信息
             position = position_service.get_position(signal.symbol)
+            self.logger.info(f"当前持仓: {position}")
 
             # 判断是否是期货
-            is_futures = 'DCE' in signal.symbol or 'SHFE' in signal.symbol or 'CZCE' in signal.symbol
+            is_futures_symbol = is_futures(signal.symbol)
+            
+            # 如果是期货，获取交易乘数
+            multiplier = get_multiplier(signal.symbol.split('-')[1]) if is_futures_symbol else 10
+            self.logger.info(f"品种: {signal.symbol}，{signal.symbol.split('-')[1]}, 是否期货: {is_futures_symbol}, 交易乘数: {multiplier}")
 
-            if signal.type == 'buy':
-                if signal.status == 'open':
+            db = self.SessionLocal()
+            try:
+                if signal.type == 'BUY_OPEN':
+                    self.logger.info("处理买入开仓")
                     # 买入开仓
                     if position:
                         # 已有持仓，更新持仓成本
@@ -254,6 +266,7 @@ class SignalService:
                         position.price = total_cost / total_quantity
                         position.quantity = total_quantity
                         position_service.update_position(position)
+                        self.logger.info(f"更新持仓: {position}")
                     else:
                         # 新建持仓
                         position = position_service.create_position(PositionCreate(
@@ -262,52 +275,24 @@ class SignalService:
                             quantity=signal.quantity,
                             status='open'
                         ))
+                        self.logger.info(f"新建持仓: {position}")
                     
                     # 更新可用资金
-                    if is_futures:
+                    if is_futures_symbol:
                         # 期货只需要保证金，假设保证金比例为10%
                         margin = trade_amount * 0.1
                         account.available_balance -= (margin + commission)
+                        self.logger.info(f"期货保证金: {margin}")
                     else:
                         # 股票需要全额资金
                         account.available_balance -= (trade_amount + commission)
+                        self.logger.info(f"股票全额资金: {trade_amount}")
                     
                     account.total_commission += commission
-                else:
-                    # 买入平仓
-                    if not position or position.quantity < signal.quantity:
-                        self.logger.error("持仓数量不足")
-                        return
-                    
-                    # 计算盈亏
-                    if is_futures:
-                        # 期货盈亏 = (平仓价格 - 开仓价格) * 数量 - 手续费
-                        profit = (signal.price - position.price) * signal.quantity - commission
-                    else:
-                        # 股票盈亏 = (平仓价格 - 开仓价格) * 数量 - 手续费
-                        profit = (signal.price - position.price) * signal.quantity - commission
-                    
-                    # 更新持仓
-                    position.quantity -= signal.quantity
-                    if position.quantity == 0:
-                        position.status = 'closed'
-                    position_service.update_position(position)
-                    
-                    # 更新账户余额
-                    account.current_balance += profit
-                    if is_futures:
-                        # 期货返还保证金
-                        margin = trade_amount * 0.1
-                        account.available_balance += (margin + profit)
-                    else:
-                        # 股票返还全额资金
-                        account.available_balance += (trade_amount + profit)
-                    
-                    account.total_profit += profit
-                    account.total_commission += commission
+                    self.logger.info(f"更新账户余额: {account.available_balance}")
 
-            elif signal.type == 'sell':
-                if signal.status == 'open':
+                elif signal.type == 'SELL_OPEN':
+                    self.logger.info("处理卖出开仓")
                     # 卖出开仓
                     if position:
                         # 已有持仓，更新持仓成本
@@ -316,6 +301,7 @@ class SignalService:
                         position.price = total_cost / total_quantity
                         position.quantity = total_quantity
                         position_service.update_position(position)
+                        self.logger.info(f"更新持仓: {position}")
                     else:
                         # 新建持仓
                         position = position_service.create_position(PositionCreate(
@@ -324,61 +310,156 @@ class SignalService:
                             quantity=signal.quantity,
                             status='open'
                         ))
+                        self.logger.info(f"新建持仓: {position}")
                     
                     # 更新可用资金
-                    if is_futures:
+                    if is_futures_symbol:
                         # 期货只需要保证金，假设保证金比例为10%
                         margin = trade_amount * 0.1
                         account.available_balance -= (margin + commission)
+                        self.logger.info(f"期货保证金: {margin}")
                     else:
                         # 股票需要全额资金
                         account.available_balance -= (trade_amount + commission)
+                        self.logger.info(f"股票全额资金: {trade_amount}")
                     
                     account.total_commission += commission
-                else:
-                    # 卖出平仓
-                    if not position or position.quantity < signal.quantity:
-                        self.logger.error("持仓数量不足")
-                        return
-                    
-                    # 计算盈亏
-                    if is_futures:
-                        # 期货盈亏 = (开仓价格 - 平仓价格) * 数量 - 手续费
-                        profit = (position.price - signal.price) * signal.quantity - commission
-                    else:
-                        # 股票盈亏 = (开仓价格 - 平仓价格) * 数量 - 手续费
-                        profit = (position.price - signal.price) * signal.quantity - commission
-                    
-                    # 更新持仓
-                    position.quantity -= signal.quantity
-                    if position.quantity == 0:
-                        position.status = 'closed'
-                    position_service.update_position(position)
-                    
-                    # 更新账户余额
-                    account.current_balance += profit
-                    if is_futures:
-                        # 期货返还保证金
-                        margin = trade_amount * 0.1
-                        account.available_balance += (margin + profit)
-                    else:
-                        # 股票返还全额资金
-                        account.available_balance += (trade_amount + profit)
-                    
-                    account.total_profit += profit
-                    account.total_commission += commission
+                    self.logger.info(f"更新账户余额: {account.available_balance}")
 
-            # 更新信号盈亏
-            if signal.status == 'closed':
-                signal.profit = profit
+                elif signal.type == 'BUY_CLOSE':
+                    self.logger.info("处理买入平仓")
+                    # 买入平仓（对应卖出开仓）
+                    if position:
+                        # 计算盈亏：卖出开仓，买入平仓，价格下跌是盈利
+                        profit = (position.price - signal.price) * signal.quantity * multiplier
+                        self.logger.info(f"计算盈亏: {profit}, 平仓价: {signal.price}, 持仓价: {position.price}, 乘数: {multiplier}")
+                        
+                        # 更新信号盈亏和状态
+                        db_signal = db.query(SignalDB).filter(SignalDB.id == signal.id).first()
+                        if db_signal:
+                            db_signal.profit = profit
+                            db_signal.close_price = signal.price
+                            db_signal.close_date = signal.date
+                            
+                            # 更新持仓
+                            position.quantity -= signal.quantity
+                            if position.quantity <= 0:
+                                position_service.delete_position(position.id)
+                                db_signal.status = 'closed'
+                                # 找到对应的开仓信号并更新状态
+                                open_signal = db.query(SignalDB).filter(
+                                    SignalDB.symbol == signal.symbol,
+                                    SignalDB.type == 'SELL_OPEN',
+                                    SignalDB.status.in_(['open', 'partial_closed'])
+                                ).first()
+                                if open_signal:
+                                    open_signal.status = 'closed'
+                                    self.logger.info(f"更新开仓信号状态为已平仓: {open_signal.id}")
+                                self.logger.info("完全平仓，删除持仓")
+                            else:
+                                position.status = 'partial_closed'  # 部分平仓
+                                position_service.update_position(position)
+                                db_signal.status = 'partial_closed'
+                                # 找到对应的开仓信号并更新状态
+                                open_signal = db.query(SignalDB).filter(
+                                    SignalDB.symbol == signal.symbol,
+                                    SignalDB.type == 'SELL_OPEN',
+                                    SignalDB.status == 'open'
+                                ).first()
+                                if open_signal:
+                                    open_signal.status = 'partial_closed'
+                                    self.logger.info(f"更新开仓信号状态为部分平仓: {open_signal.id}")
+                                self.logger.info(f"部分平仓，更新持仓: {position}")
+                            
+                            # 更新账户余额
+                            account.available_balance += profit
+                            account.total_commission += commission
+                            self.logger.info(f"更新账户余额: {account.available_balance}")
+                            
+                            # 保存所有更新
+                            db.commit()
+                            self.logger.info(f"更新信号状态和盈亏: {signal.id}")
+                            
+                            # 更新信号对象以反映变更
+                            signal.status = db_signal.status
+                            signal.profit = profit
+                            signal.close_price = signal.price
+                            signal.close_date = signal.date
 
-            # 保存更新
-            self.SessionLocal().commit()
-            self.logger.info(f"交易计算完成: 信号ID={signal.id}, 盈亏={profit if signal.status == 'closed' else 0}, 手续费={commission}")
+                elif signal.type == 'SELL_CLOSE':
+                    self.logger.info("处理卖出平仓")
+                    # 卖出平仓（对应买入开仓）
+                    if position:
+                        # 计算盈亏：买入开仓，卖出平仓，价格上涨是盈利
+                        profit = (signal.price - position.price) * signal.quantity * multiplier
+                        self.logger.info(f"计算盈亏: {profit}, 平仓价: {signal.price}, 持仓价: {position.price}, 乘数: {multiplier}")
+                        
+                        # 更新信号盈亏和状态
+                        db_signal = db.query(SignalDB).filter(SignalDB.id == signal.id).first()
+                        if db_signal:
+                            db_signal.profit = profit
+                            db_signal.close_price = signal.price
+                            db_signal.close_date = signal.date
+                            
+                            # 更新持仓
+                            position.quantity -= signal.quantity
+                            if position.quantity <= 0:
+                                position_service.delete_position(position.id)
+                                db_signal.status = 'closed'
+                                # 找到对应的开仓信号并更新状态
+                                open_signal = db.query(SignalDB).filter(
+                                    SignalDB.symbol == signal.symbol,
+                                    SignalDB.type == 'BUY_OPEN',
+                                    SignalDB.status.in_(['open', 'partial_closed'])
+                                ).first()
+                                if open_signal:
+                                    open_signal.status = 'closed'
+                                    self.logger.info(f"更新开仓信号状态为已平仓: {open_signal.id}")
+                                self.logger.info("完全平仓，删除持仓")
+                            else:
+                                position.status = 'partial_closed'  # 部分平仓
+                                position_service.update_position(position)
+                                db_signal.status = 'partial_closed'
+                                # 找到对应的开仓信号并更新状态
+                                open_signal = db.query(SignalDB).filter(
+                                    SignalDB.symbol == signal.symbol,
+                                    SignalDB.type == 'BUY_OPEN',
+                                    SignalDB.status == 'open'
+                                ).first()
+                                if open_signal:
+                                    open_signal.status = 'partial_closed'
+                                    self.logger.info(f"更新开仓信号状态为部分平仓: {open_signal.id}")
+                                self.logger.info(f"部分平仓，更新持仓: {position}")
+                            
+                            # 更新账户余额
+                            account.available_balance += profit
+                            account.total_commission += commission
+                            self.logger.info(f"更新账户余额: {account.available_balance}")
+                            
+                            # 保存所有更新
+                            db.commit()
+                            self.logger.info(f"更新信号状态和盈亏: {signal.id}")
+                            
+                            # 更新信号对象以反映变更
+                            signal.status = db_signal.status
+                            signal.profit = profit
+                            signal.close_price = signal.price
+                            signal.close_date = signal.date
 
+                # 保存账户更新
+                self.account_service.update_account(account)
+                self.logger.info(f"交易计算完成，最终账户余额: {account.available_balance}")
+                
+            except Exception as e:
+                self.logger.error(f"计算交易失败: {e}")
+                db.rollback()
+                raise
+            finally:
+                db.close()
+                
         except Exception as e:
             self.logger.error(f"计算交易失败: {e}")
-            self.SessionLocal().rollback()
+            raise
 
     def create_signal(self, signal: SignalCreate) -> Signal:
         """创建新信号"""
@@ -395,6 +476,14 @@ class SignalService:
             if close_date:
                 close_date = close_date + timedelta(hours=8)
             
+            # 对于平仓类型的信号，设置close_date和close_price
+            if signal.type in ['SELL_CLOSE', 'BUY_CLOSE']:
+                close_date = date
+                close_price = signal.price
+            else:
+                close_date = None
+                close_price = None
+            
             db_signal = SignalDB(
                 id=signal_id,
                 date=date,
@@ -405,15 +494,15 @@ class SignalService:
                 status=signal.status,
                 reason=signal.reason,
                 close_date=close_date,
-                close_price=signal.close_price,
-                profit=signal.profit
+                close_price=close_price,
+                profit=0.0  # 初始盈亏为0，在calc_trade中计算
             )
             db.add(db_signal)
             db.commit()
             db.refresh(db_signal)
             
-            # 计算交易
-            self.calc_trade(Signal(
+            # 转换为Signal对象
+            signal_obj = Signal(
                 id=db_signal.id,
                 date=db_signal.date,
                 symbol=db_signal.symbol,
@@ -427,7 +516,13 @@ class SignalService:
                 profit=db_signal.profit,
                 created_at=db_signal.created_at,
                 updated_at=db_signal.updated_at
-            ))
+            )
+            
+            # 计算交易
+            self.calc_trade(signal_obj)
+            
+            # 重新获取更新后的信号
+            db_signal = db.query(SignalDB).filter(SignalDB.id == signal_id).first()
             
             return Signal(
                 id=db_signal.id,

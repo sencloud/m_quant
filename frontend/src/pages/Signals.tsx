@@ -41,11 +41,11 @@ const Signals: React.FC = () => {
     date: (() => {
       const now = new Date();
       now.setHours(now.getHours() + 8);
-      return now.toISOString().slice(0, 16);
+      return now.toISOString().slice(0, 19);
     })(),
     symbol_type: 'stock',
     symbol: '',
-    type: 'buy',
+    type: 'BUY_OPEN',
     price: '',
     quantity: '',
     reason: ''
@@ -77,11 +77,31 @@ const Signals: React.FC = () => {
       
       // 计算统计数据
       const totalSignals = statsResponse.data.total;
-      const openSignals = statsResponse.data.signals.filter((s: Signal) => s.status === 'open').length;
-      const closedSignals = totalSignals - openSignals;
-      const totalProfit = statsResponse.data.signals.reduce((sum: number, s: Signal) => sum + s.profit, 0);
-      const profitableSignals = statsResponse.data.signals.filter((s: Signal) => s.profit > 0).length;
+      const signals = statsResponse.data.signals;
+      
+      // 只计算已完全平仓或部分平仓的信号
+      const closedSignals = signals.filter((s: Signal) => 
+        s.status === 'closed' || s.status === 'partial_closed'
+      ).length;
+      
+      // 计算总盈亏（只计算已平仓和部分平仓的信号）
+      const totalProfit = signals.reduce((sum: number, s: Signal) => {
+        if (s.status === 'closed' || s.status === 'partial_closed') {
+          return sum + (s.profit || 0);
+        }
+        return sum;
+      }, 0);
+      
+      // 计算盈利的信号数（只计算已平仓和部分平仓的信号）
+      const profitableSignals = signals.filter((s: Signal) => 
+        (s.status === 'closed' || s.status === 'partial_closed') && s.profit > 0
+      ).length;
+      
+      // 计算胜率
       const winRate = closedSignals > 0 ? (profitableSignals / closedSignals) * 100 : 0;
+      
+      // 计算持仓中的信号数
+      const openSignals = signals.filter((s: Signal) => s.status === 'open').length;
       
       setStatistics({
         totalSignals,
@@ -90,7 +110,7 @@ const Signals: React.FC = () => {
         totalProfit,
         winRate,
         initialBalance: accountResponse.data.initial_balance,
-        currentBalance: accountResponse.data.current_balance,
+        currentBalance: accountResponse.data.initial_balance + totalProfit - accountResponse.data.total_commission,
         totalCommission: accountResponse.data.total_commission
       });
 
@@ -173,11 +193,11 @@ const Signals: React.FC = () => {
         date: (() => {
           const now = new Date();
           now.setHours(now.getHours() + 8);
-          return now.toISOString().slice(0, 16);
+          return now.toISOString().slice(0, 19);
         })(),
         symbol_type: 'stock',
         symbol: '',
-        type: 'buy',
+        type: 'BUY_OPEN',
         price: '',
         quantity: '',
         reason: ''
@@ -229,8 +249,10 @@ const Signals: React.FC = () => {
             className="signal-type-select"
           >
             <option value="all">全部信号</option>
-            <option value="buy">买入信号</option>
-            <option value="sell">卖出信号</option>
+            <option value="BUY_OPEN">买入开仓</option>
+            <option value="SELL_OPEN">卖出开仓</option>
+            <option value="BUY_CLOSE">买入平仓</option>
+            <option value="SELL_CLOSE">卖出平仓</option>
             <option value="open">持仓中</option>
             <option value="closed">已平仓</option>
           </select>
@@ -300,7 +322,15 @@ const Signals: React.FC = () => {
             <tbody>
               {signals.map((signal) => (
                 <tr key={signal.id}>
-                  <td>{new Date(signal.date).toLocaleString()}</td>
+                  <td>{new Date(signal.date).toLocaleString('zh-CN', {
+                    year: 'numeric',
+                    month: '2-digit',
+                    day: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit',
+                    hour12: false
+                  })}</td>
                   <td>
                     <div className="symbol-cell">
                       <span className="symbol-text">{signal.symbol.split('-')[1]}</span>
@@ -315,18 +345,31 @@ const Signals: React.FC = () => {
                   </td>
                   <td>
                     <span className={`signal-tag ${signal.type}`}>
-                      {signal.type === 'buy' ? '买入' : '卖出'}
+                      {signal.type === 'BUY_OPEN' ? '买入开仓' : 
+                       signal.type === 'SELL_OPEN' ? '卖出开仓' :
+                       signal.type === 'BUY_CLOSE' ? '买入平仓' :
+                       signal.type === 'SELL_CLOSE' ? '卖出平仓' : signal.type}
                     </span>
                   </td>
                   <td>{signal.price.toFixed(2)}</td>
                   <td>{signal.quantity}</td>
                   <td>
                     <span className={`status-tag ${signal.status}`}>
-                      {signal.status === 'open' ? '持仓中' : '已平仓'}
+                      {signal.status === 'open' ? '持仓中' : 
+                       signal.status === 'closed' ? '已平仓' :
+                       signal.status === 'partial_closed' ? '部分平仓' : signal.status}
                     </span>
                   </td>
                   <td>{signal.reason}</td>
-                  <td>{signal.close_date ? new Date(signal.close_date).toLocaleString() : '-'}</td>
+                  <td>{signal.close_date ? new Date(signal.close_date).toLocaleString('zh-CN', {
+                    year: 'numeric',
+                    month: '2-digit',
+                    day: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit',
+                    hour12: false
+                  }) : '-'}</td>
                   <td>{signal.close_price ? signal.close_price.toFixed(2) : '-'}</td>
                   <td className={signal.profit >= 0 ? 'profit' : 'loss'}>
                     {signal.profit.toFixed(2)}
@@ -449,6 +492,7 @@ const Signals: React.FC = () => {
                     name="date"
                     value={formData.date}
                     onChange={handleInputChange}
+                    step="1"
                     required
                   />
                 </div>
@@ -488,8 +532,10 @@ const Signals: React.FC = () => {
                     onChange={handleInputChange}
                     required
                   >
-                    <option value="buy">买入</option>
-                    <option value="sell">卖出</option>
+                    <option value="BUY_OPEN">买入开仓</option>
+                    <option value="SELL_OPEN">卖出开仓</option>
+                    <option value="BUY_CLOSE">买入平仓</option>
+                    <option value="SELL_CLOSE">卖出平仓</option>
                   </select>
                 </div>
 

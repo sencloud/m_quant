@@ -5,12 +5,15 @@ from enum import Enum
 import uuid
 
 class SignalType(str, Enum):
-    BUY = "buy"
-    SELL = "sell"
+    BUY_OPEN = "BUY_OPEN"
+    SELL_OPEN = "SELL_OPEN"
+    BUY_CLOSE = "BUY_CLOSE"
+    SELL_CLOSE = "SELL_CLOSE"
 
 class SignalStatus(str, Enum):
     OPEN = "open"
     CLOSED = "closed"
+    PARTIAL_CLOSED = "partial_closed"
 
 class SignalBase(BaseModel):
     date: datetime

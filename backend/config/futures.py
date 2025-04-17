@@ -1,41 +1,7 @@
-from pydantic_settings import BaseSettings
-from functools import lru_cache
-
-class Settings(BaseSettings):
-    # Tushare API配置
-    TUSHARE_TOKEN: str
-    
-    # Deepseek API配置
-    DEEPSEEK_API_KEY: str
-
-    OPENAI_API_KEY: str
-    OPENAI_BASE_URL: str
-    
-    # 应用配置
-    PROJECT_NAME: str = "豆粕组合策略"
-    API_V1_STR: str = "/api/v1"
-    
-    # 数据库配置
-    DATABASE_URL: str | None = None
-    
-    # 日志配置
-    LOG_LEVEL: str = "INFO"
-    LOG_FILE_PATH: str = "logs/app.log"
-    
-    # 安全配置
-    SECRET_KEY: str = "your_secret_key_here"
-    ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
-    
-    class Config:
-        env_file = ".env"
-        case_sensitive = True
-
-@lru_cache()
-def get_settings():
-    return Settings()
-
-settings = get_settings() 
+"""
+期货配置文件
+包含常用期货品种的交易乘数等信息
+"""
 
 # 期货交易乘数配置
 FUTURES_MULTIPLIER = {
@@ -74,14 +40,18 @@ FUTURES_MULTIPLIER = {
 def get_multiplier(symbol: str) -> int:
     """
     获取期货品种的交易乘数
-    :param symbol: 期货代码，例如 'M2401'
+    :param symbol: 期货代码，例如 'M2401' 或 'M2401.DCE'
     :return: 交易乘数，如果找不到则返回1
     """
+    # 去掉交易所后缀（如果有）
+    symbol = symbol.split('.')[0]
     # 提取品种代码（去掉月份）
-    # 只提取第一个字母或连续的字母作为品种代码
-    import re
-    product = re.match(r'([A-Za-z]+)', symbol.upper())
-    product = product.group(1) if product else ""
+    product = ''
+    for char in symbol:
+        if char.isalpha():
+            product += char.upper()
+        else:
+            break
     return FUTURES_MULTIPLIER.get(product, 1)
 
 def is_futures(symbol: str) -> bool:

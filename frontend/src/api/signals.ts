@@ -1,15 +1,17 @@
 import { API_BASE_URL } from '../config/api';
 import axios from 'axios';
 
+export type SignalStatus = 'open' | 'closed' | 'partial_closed';
+
 export interface Signal {
-  id: number;
+  id: string;
   date: string;
   symbol: string;
   symbol_type: string;
-  type: 'buy' | 'sell';
+  type: 'BUY_OPEN' | 'SELL_OPEN' | 'BUY_CLOSE' | 'SELL_CLOSE';
   price: number;
   quantity: number;
-  status: 'open' | 'closed';
+  status: SignalStatus;
   reason: string;
   close_date?: string;
   close_price?: number;
@@ -22,7 +24,7 @@ export interface SignalCreate {
   date: string;
   symbol: string;
   symbol_type: string;
-  type: 'buy' | 'sell';
+  type: 'BUY_OPEN' | 'SELL_OPEN' | 'BUY_CLOSE' | 'SELL_CLOSE';
   price: number;
   quantity: number;
   status: 'open' | 'closed';

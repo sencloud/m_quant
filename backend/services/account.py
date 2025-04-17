@@ -52,20 +52,47 @@ class AccountService:
         finally:
             db.close()
 
-    def update_balance(self, profit: float, commission: float) -> AccountDB:
-        """更新账户余额和手续费"""
+    def update_account(self, account: AccountDB) -> None:
+        """更新账户信息"""
+        try:
+            db = self.SessionLocal()
+            db_account = db.query(AccountDB).first()
+            if not db_account:
+                raise ValueError("账户不存在")
+            
+            # 更新账户信息
+            db_account.current_balance = account.current_balance
+            db_account.available_balance = account.available_balance
+            db_account.total_profit = account.total_profit
+            db_account.total_commission = account.total_commission
+            db_account.position_cost = account.position_cost
+            db_account.position_quantity = account.position_quantity
+            
+            db.commit()
+            self.logger.info("账户信息更新成功")
+        except Exception as e:
+            self.logger.error(f"更新账户信息失败: {e}")
+            db.rollback()
+            raise
+        finally:
+            db.close()
+
+    def update_balance(self, profit: float, commission: float) -> None:
+        """更新账户余额"""
         try:
             db = self.SessionLocal()
             account = db.query(AccountDB).first()
             if not account:
                 raise ValueError("账户不存在")
             
+            # 更新账户余额
             account.current_balance += profit
+            account.available_balance += profit
+            account.total_profit += profit
             account.total_commission += commission
             
             db.commit()
-            db.refresh(account)
-            return account
+            self.logger.info(f"账户余额更新成功: 盈亏={profit}, 手续费={commission}")
         except Exception as e:
             self.logger.error(f"更新账户余额失败: {e}")
             db.rollback()
