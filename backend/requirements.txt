@@ -23,3 +23,5 @@ questionary
 langchain_openai
 langchain_ollama
 langchain_deepseek
+colorama
+matplotlib

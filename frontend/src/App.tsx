@@ -13,6 +13,7 @@ import Agents from './pages/Agents';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 import TermsOfService from './pages/TermsOfService';
 import Disclaimer from './pages/Disclaimer';
+import Signals from './pages/Signals';
 
 const queryClient = new QueryClient();
 
@@ -23,6 +24,7 @@ const App: React.FC = () => {
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/trading" element={<Trading />} />
+          <Route path="/signals" element={<Signals />} />
           <Route path="/research" element={<Research />} />
           <Route path="/research/strategy-advice" element={<StrategyAdvicePage />} />
           <Route path="/research/core-factor" element={<CoreFactorAnalysisPage />} />

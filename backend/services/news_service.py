@@ -513,6 +513,23 @@ class NewsService:
             # 分析每条新闻
             analysis_results = []
             for article in news_articles:
+                # 检查是否已经分析过
+                if article.analysis:
+                    try:
+                        # 解析已有的分析结果
+                        existing_analysis = json.loads(article.analysis)
+                        analysis_results.append({
+                            "title": article.title,
+                            "content": article.content,
+                            "datetime": article.datetime.strftime('%Y-%m-%d %H:%M:%S'),
+                            **existing_analysis
+                        })
+                        logger.info(f"跳过已分析的新闻: {article.title}")
+                        continue
+                    except json.JSONDecodeError:
+                        # 如果解析失败，继续进行分析
+                        logger.warning(f"已有分析结果解析失败，重新分析: {article.title}")
+                
                 logger.info(f"开始分析新闻: {article.title}")
                 prompt = f"""请分析以下新闻对豆粕市场的影响：
 

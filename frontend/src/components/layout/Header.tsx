@@ -57,13 +57,13 @@ const Header: React.FC = () => {
   // 研究报告子菜单项
   const researchMenuItems = [
     {
-      key: 'strategy-advice',
+      key: 'options-strategy',
       label: (
-        <Link to="/research/strategy-advice" className="flex items-center py-2 px-4 hover:bg-gray-50">
-          <BarChartOutlined className="mr-3 text-blue-500 text-xl" />
+        <Link to="/research/options-strategy" className="flex items-center py-2 px-4 hover:bg-gray-50">
+          <FundOutlined className="mr-3 text-purple-500 text-xl" />
           <div>
-            <div className="font-medium">交易策略建议</div>
-            <div className="text-xs text-gray-500">基于市场数据的交易策略分析和建议</div>
+            <div className="font-medium">基本面分析</div>
+            <div className="text-xs text-gray-500">基于基本面的豆粕策略分析</div>
           </div>
         </Link>
       ),
@@ -81,13 +81,13 @@ const Header: React.FC = () => {
       ),
     },
     {
-      key: 'options-strategy',
+      key: 'strategy-advice',
       label: (
-        <Link to="/research/options-strategy" className="flex items-center py-2 px-4 hover:bg-gray-50">
-          <FundOutlined className="mr-3 text-purple-500 text-xl" />
+        <Link to="/research/strategy-advice" className="flex items-center py-2 px-4 hover:bg-gray-50">
+          <BarChartOutlined className="mr-3 text-blue-500 text-xl" />
           <div>
-            <div className="font-medium">基本面分析</div>
-            <div className="text-xs text-gray-500">基于基本面的豆粕策略分析</div>
+            <div className="font-medium">交易策略建议</div>
+            <div className="text-xs text-gray-500">基于市场数据的交易策略分析和建议</div>
           </div>
         </Link>
       ),
@@ -121,8 +121,11 @@ const Header: React.FC = () => {
 
           {/* Desktop Navigation */}
           <nav className="hidden md:flex space-x-8">
+            <NavLink to="/signals" className={getNavLinkClass}>
+              信号
+            </NavLink>
             <NavLink to="/trading" className={getNavLinkClass}>
-              交易策略
+              策略
             </NavLink>
             <Dropdown 
               menu={{ items: researchMenuItems }} 
@@ -183,24 +186,31 @@ const Header: React.FC = () => {
       <div className={`${isMenuOpen ? 'block' : 'hidden'} md:hidden`}>
         <div className="px-2 pt-2 pb-3 space-y-1">
           <NavLink
+            to="/signals"
+            className={getNavLinkClass}
+            onClick={() => setIsMenuOpen(false)}
+          >
+            信号
+          </NavLink>
+          <NavLink
             to="/trading"
             className={getNavLinkClass}
             onClick={() => setIsMenuOpen(false)}
           >
-            交易策略
+            策略
           </NavLink>
           <div className="px-3 py-2">
             <div className="text-gray-700 font-medium">研究报告</div>
             <div className="mt-2 space-y-1">
               <NavLink
-                to="/research/strategy-advice"
+                to="/research/options-strategy"
                 className="flex items-center py-2 px-4 hover:bg-gray-50 rounded-md"
                 onClick={() => setIsMenuOpen(false)}
               >
-                <BarChartOutlined className="mr-3 text-blue-500 text-xl" />
+                <FundOutlined className="mr-3 text-purple-500 text-xl" />
                 <div>
-                  <div className="font-medium">交易策略建议</div>
-                  <div className="text-xs text-gray-500">基于市场数据的交易策略分析和建议</div>
+                  <div className="font-medium">基本面分析</div>
+                  <div className="text-xs text-gray-500">基于基本面的豆粕策略分析</div>
                 </div>
               </NavLink>
               <NavLink
@@ -215,14 +225,14 @@ const Header: React.FC = () => {
                 </div>
               </NavLink>
               <NavLink
-                to="/research/options-strategy"
+                to="/research/strategy-advice"
                 className="flex items-center py-2 px-4 hover:bg-gray-50 rounded-md"
                 onClick={() => setIsMenuOpen(false)}
               >
-                <FundOutlined className="mr-3 text-purple-500 text-xl" />
+                <BarChartOutlined className="mr-3 text-blue-500 text-xl" />
                 <div>
-                  <div className="font-medium">基本面分析</div>
-                  <div className="text-xs text-gray-500">基于基本面的豆粕策略分析</div>
+                  <div className="font-medium">交易策略建议</div>
+                  <div className="text-xs text-gray-500">基于市场数据的交易策略分析和建议</div>
                 </div>
               </NavLink>
             </div>
