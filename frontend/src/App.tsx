@@ -14,6 +14,7 @@ import PrivacyPolicy from './pages/PrivacyPolicy';
 import TermsOfService from './pages/TermsOfService';
 import Disclaimer from './pages/Disclaimer';
 import Signals from './pages/Signals';
+import MultiVarietyArbitrage from './pages/MultiVarietyArbitrage';
 
 const queryClient = new QueryClient();
 
@@ -32,6 +33,7 @@ const App: React.FC = () => {
           <Route path="/pro-analysis" element={<ProAnalysis />} />
           <Route path="/news-analysis" element={<NewsAnalysis />} />
           <Route path="/agents" element={<Agents />} />
+          <Route path="/multi-variety-arbitrage" element={<MultiVarietyArbitrage />} />
           <Route path="/privacy" element={<PrivacyPolicy />} />
           <Route path="/terms" element={<TermsOfService />} />
           <Route path="/disclaimer" element={<Disclaimer />} />

@@ -76,6 +76,18 @@ const Trading: React.FC = () => {
         </div>
 
         <StrategyCard
+          title="豆粕近远月套利策略"
+          tags={[
+            { text: "套利策略", color: "text-indigo-800 bg-indigo-100" },
+            { text: "价差交易", color: "text-orange-800 bg-orange-100" },
+            { text: "已回测", color: "text-green-800 bg-green-100" }
+          ]}
+          icon={<ArrowsRightLeftIcon />}
+        >
+          <ArbitrageStrategy />
+        </StrategyCard>
+        
+        {/* <StrategyCard
           title="豆粕均线趋势跟随策略（以M2501合约为例）"
           tags={[
             { text: "趋势策略", color: "text-blue-800 bg-blue-100" },
@@ -84,7 +96,7 @@ const Trading: React.FC = () => {
           icon={<ChartBarIcon />}
         >
           <TrendFollowStrategy />
-        </StrategyCard>
+        </StrategyCard> */}
 
         <StrategyCard
           title="豆粕ETF（159985）金叉做多策略"
@@ -97,19 +109,9 @@ const Trading: React.FC = () => {
           <ETFStrategy />
         </StrategyCard>
 
-        <StrategyCard
-          title="豆粕近远月套利策略"
-          tags={[
-            { text: "套利策略", color: "text-indigo-800 bg-indigo-100" },
-            { text: "价差交易", color: "text-orange-800 bg-orange-100" },
-            { text: "已回测", color: "text-green-800 bg-green-100" }
-          ]}
-          icon={<ArrowsRightLeftIcon />}
-        >
-          <ArbitrageStrategy />
-        </StrategyCard>
+        
 
-        <StrategyCard
+        {/* <StrategyCard
           title="OBV-EMA组合策略"
           tags={[
             { text: "技术面策略", color: "text-blue-800 bg-blue-100" },
@@ -119,7 +121,7 @@ const Trading: React.FC = () => {
           icon={<ChartBarIcon />}
         >
           <OBVADXEMAStrategy />
-        </StrategyCard>
+        </StrategyCard> */}
 
         {/* 期货期权对冲策略部分 */}
         {/* <div className="mb-12">

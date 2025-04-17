@@ -29,6 +29,18 @@ const Header: React.FC = () => {
       ),
     },
     {
+      key: 'multi-variety-arbitrage',
+      label: (
+        <Link to="/multi-variety-arbitrage" className="flex items-center py-2 px-4 hover:bg-gray-50">
+          <FundOutlined className="mr-3 text-yellow-500 text-xl" />
+          <div>
+            <div className="font-medium">多品种套利</div>
+            <div className="text-xs text-gray-500">豆二、豆粕、豆油三者动态套利</div>
+          </div>
+        </Link>
+      ),
+    },
+    {
       key: 'news-analysis',
       label: (
         <Link to="/news-analysis" className="flex items-center py-2 px-4 hover:bg-gray-50">
