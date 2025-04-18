@@ -99,6 +99,16 @@ const Footer: React.FC = () => {
         {/* Copyright */}
         <div className="mt-8 pt-8 border-t border-gray-800 text-center text-gray-400 text-sm">
           <p>© {new Date().getFullYear()} 新致智能量化. All rights reserved.</p>
+          <p className="mt-2">
+            <a 
+              href="http://beian.miit.gov.cn/" 
+              target="_blank" 
+              rel="noopener noreferrer" 
+              className="hover:text-white"
+            >
+              苏ICP备2025174962号
+            </a>
+          </p>
         </div>
       </div>
     </footer>
