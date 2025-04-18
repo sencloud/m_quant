@@ -5,6 +5,8 @@ import ReactECharts from 'echarts-for-react';
 import dayjs from 'dayjs';
 import Layout from '../components/layout/Layout';
 import Toast from '../components/Toast';
+import axios from 'axios';
+import { API_BASE_URL } from '../config/api';
 
 const { Title, Paragraph, Text } = Typography;
 const { TabPane } = Tabs;
@@ -36,16 +38,17 @@ const MultiVarietyArbitrage: React.FC = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // 实际项目中这里应该调用API
-        const newOilMealRatio = oilMealRatio + (Math.random() - 0.5) * 0.02;
-        const newCrushingMargin = crushingMargin + (Math.random() - 0.5) * 5;
+        const response = await axios.get(`${API_BASE_URL}/arbitrage/realtime`);
+        const data = response.data;
         
-        setOilMealRatio(newOilMealRatio);
-        setCrushingMargin(newCrushingMargin);
+        // 更新油粕比数据
+        setOilMealRatio(data.oil_meal_ratio.current_ratio);
+        setOilMealRatioData(data.oil_meal_ratio.historical_data.values);
         
-        // 更新图表数据
-        setOilMealRatioData(prev => [...prev.slice(1), newOilMealRatio]);
-        setCrushingMarginData(prev => [...prev.slice(1), newCrushingMargin]);
+        // 更新压榨利润数据
+        setCrushingMargin(data.crushing_margin.current_margin);
+        setHistoricalAverage(data.crushing_margin.historical_average);
+        setCrushingMarginData(data.crushing_margin.historical_data.values);
         
       } catch (error) {
         console.error('获取数据失败:', error);
@@ -56,9 +59,10 @@ const MultiVarietyArbitrage: React.FC = () => {
       }
     };
 
-    const timer = setInterval(fetchData, 3000);
+    fetchData(); // 首次加载
+    const timer = setInterval(fetchData, 5000); // 每5秒更新一次
     return () => clearInterval(timer);
-  }, [oilMealRatio, crushingMargin]);
+  }, []);
 
   // 油粕比图表配置
   const oilMealRatioOption = useMemo(() => ({
