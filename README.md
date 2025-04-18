@@ -3,19 +3,19 @@
 ## 项目简介
 
 这是一个专注于豆粕品种交易的量化交易策略平台。平台整合了豆粕ETF、豆粕期货和期权的交易分析，为投资者提供全方位的交易决策支持。
+访问网站立即体验：https://www.singzquant.com/
 
 ## 核心功能
 
 - **核心观点**: 提供豆粕市场的核心交易观点和策略建议
 - **每日分析**: 实时更新市场动态，技术面和基本面分析
-- **AI量化模型**: 基于深度强化学习的交易策略辅助系统
+- **AI量化模型**: 基于深度强化学习和多智能体的交易策略辅助系统
 - 功能截图
-![image](https://github.com/user-attachments/assets/e2e7c614-299a-47b5-abc3-47cbcb27ae1a)
-![image](https://github.com/user-attachments/assets/5a838f54-c7e4-4bea-b73b-f6d9fa2bad8a)
-![image](https://github.com/user-attachments/assets/0ae27f63-8881-4bfd-b903-d7eebfac4ecf)
-![image](https://github.com/user-attachments/assets/213f272b-3f89-47eb-a73f-decbdcc6f20c)
-![image](https://github.com/user-attachments/assets/65212da6-9ae0-44e4-a247-c0d157d98b76)
-
+![image](https://github.com/user-attachments/assets/e1d5a3d5-cfb6-466a-8cf9-400cb58d5800)
+![image](https://github.com/user-attachments/assets/02504afe-fe54-4b20-b4ad-4a6f38d57b45)
+![image](https://github.com/user-attachments/assets/5879b683-1846-4a2c-86a3-ddf540b43e4f)
+![image](https://github.com/user-attachments/assets/833a6ad6-48d3-4d6b-908e-6550bcf84326)
+![image](https://github.com/user-attachments/assets/469b615c-aef9-4aaf-8ab4-393dc23ab04e)
 
 ## 技术架构
 
