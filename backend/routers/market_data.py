@@ -262,4 +262,16 @@ async def get_event_price_data(
         return data
     except Exception as e:
         logger.error(f"事件价格数据请求失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/arbitrage/realtime")
+async def get_realtime_arbitrage_data(
+    service: MarketDataService = Depends(get_market_data_service)
+):
+    """获取实时套利数据"""
+    try:
+        data = service.get_realtime_arbitrage_data()
+        return data
+    except Exception as e:
+        logger.error(f"获取实时套利数据失败: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e)) 

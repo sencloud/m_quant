@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Tabs, Card, Typography, Statistic, Row, Col, Alert, Spin } from 'antd';
+import { Tabs, Card, Typography, Statistic, Row, Col, Alert, Spin, Switch } from 'antd';
 import { ArrowUpOutlined, ArrowDownOutlined } from '@ant-design/icons';
 import ReactECharts from 'echarts-for-react';
 import dayjs from 'dayjs';
@@ -13,9 +13,11 @@ const { TabPane } = Tabs;
 
 const MultiVarietyArbitrage: React.FC = () => {
   const [loading, setLoading] = useState(false);
+  const [isRealtime, setIsRealtime] = useState(false);
   const [oilMealRatio, setOilMealRatio] = useState<number>(2.29);
   const [crushingMargin, setCrushingMargin] = useState<number>(240);
   const [historicalAverage, setHistoricalAverage] = useState<number>(150);
+  const [timeData, setTimeData] = useState<string[]>([]);
   const [oilMealRatioData, setOilMealRatioData] = useState<number[]>(
     Array.from({length: 60}, () => 2 + Math.random() * 0.5)
   );
@@ -27,42 +29,49 @@ const MultiVarietyArbitrage: React.FC = () => {
     type: 'success' | 'error' | 'info';
   } | null>(null);
 
-  // 生成时间轴数据
-  const timeData = useMemo(() => 
-    Array.from({length: 60}, (_, i) => 
-      dayjs().subtract(60 - i, 'minute').format('HH:mm')
-    ), []
-  );
+  // 获取数据
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      const apiPath = isRealtime ? '/market/arbitrage/realtime' : '/arbitrage/realtime';
+      const response = await axios.get(`${API_BASE_URL}${apiPath}`);
+      const data = response.data;
+      
+      // 更新时间轴数据
+      setTimeData(data.timestamps);
+      
+      // 更新油粕比数据
+      setOilMealRatio(data.oil_meal_ratio.current_ratio);
+      setOilMealRatioData(data.oil_meal_ratio.values);
+      
+      // 更新压榨利润数据
+      setCrushingMargin(data.crushing_margin.current_margin);
+      setHistoricalAverage(data.crushing_margin.historical_average);
+      setCrushingMarginData(data.crushing_margin.values);
+      
+    } catch (error) {
+      console.error('获取数据失败:', error);
+      setToast({
+        message: '获取数据失败',
+        type: 'error'
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
 
-  // 模拟实时数据更新
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const response = await axios.get(`${API_BASE_URL}/arbitrage/realtime`);
-        const data = response.data;
-        
-        // 更新油粕比数据
-        setOilMealRatio(data.oil_meal_ratio.current_ratio);
-        setOilMealRatioData(data.oil_meal_ratio.historical_data.values);
-        
-        // 更新压榨利润数据
-        setCrushingMargin(data.crushing_margin.current_margin);
-        setHistoricalAverage(data.crushing_margin.historical_average);
-        setCrushingMarginData(data.crushing_margin.historical_data.values);
-        
-      } catch (error) {
-        console.error('获取数据失败:', error);
-        setToast({
-          message: '获取数据失败',
-          type: 'error'
-        });
-      }
-    };
-
     fetchData(); // 首次加载
-    const timer = setInterval(fetchData, 5000); // 每5秒更新一次
-    return () => clearInterval(timer);
-  }, []);
+    
+    let timer: NodeJS.Timeout | null = null;
+    if (isRealtime) {
+      timer = setInterval(fetchData, 60000); // 实时模式下每1分钟更新一次
+    }
+    
+    return () => {
+      if (timer) clearInterval(timer);
+    };
+  }, [isRealtime]);
 
   // 油粕比图表配置
   const oilMealRatioOption = useMemo(() => ({
@@ -72,7 +81,10 @@ const MultiVarietyArbitrage: React.FC = () => {
     },
     tooltip: {
       trigger: 'axis',
-      formatter: '{b}: {c}'
+      formatter: (params: any) => {
+        const data = params[0];
+        return `${data.axisValue}<br/>${data.seriesName}: ${data.value.toFixed(3)}`;
+      }
     },
     grid: {
       left: '3%',
@@ -80,15 +92,30 @@ const MultiVarietyArbitrage: React.FC = () => {
       bottom: '3%',
       containLabel: true
     },
+    dataZoom: [{
+      type: 'inside',
+      start: 80,
+      end: 100
+    }, {
+      type: 'slider',
+      start: 80,
+      end: 100
+    }],
     xAxis: {
       type: 'category',
-      data: timeData
+      data: timeData,
+      axisLabel: {
+        rotate: 45,
+        formatter: (value: string) => {
+          return value.slice(11, 16); // 只显示时:分
+        }
+      }
     },
     yAxis: {
       type: 'value',
       name: '油粕比',
-      min: 1.8,
-      max: 2.8,
+      min: 2.2,
+      max: 3.2,
       splitLine: {
         show: true,
         lineStyle: {
@@ -97,6 +124,7 @@ const MultiVarietyArbitrage: React.FC = () => {
       }
     },
     series: [{
+      name: '油粕比',
       data: oilMealRatioData,
       type: 'line',
       smooth: true,
@@ -106,8 +134,8 @@ const MultiVarietyArbitrage: React.FC = () => {
       },
       markLine: {
         data: [
-          { yAxis: 2.0, name: '下限', lineStyle: { color: '#ff4d4f' } },
-          { yAxis: 2.5, name: '上限', lineStyle: { color: '#ff4d4f' } }
+          { yAxis: 2.5, name: '下限', lineStyle: { color: '#ff4d4f' } },
+          { yAxis: 2.8, name: '上限', lineStyle: { color: '#ff4d4f' } }
         ]
       }
     }]
@@ -121,7 +149,10 @@ const MultiVarietyArbitrage: React.FC = () => {
     },
     tooltip: {
       trigger: 'axis',
-      formatter: '{b}: {c}元/吨'
+      formatter: (params: any) => {
+        const data = params[0];
+        return `${data.axisValue}<br/>${data.seriesName}: ${data.value.toFixed(3)}元/吨`;
+      }
     },
     grid: {
       left: '3%',
@@ -129,9 +160,24 @@ const MultiVarietyArbitrage: React.FC = () => {
       bottom: '3%',
       containLabel: true
     },
+    dataZoom: [{
+      type: 'inside',
+      start: 80,
+      end: 100
+    }, {
+      type: 'slider',
+      start: 80,
+      end: 100
+    }],
     xAxis: {
       type: 'category',
-      data: timeData
+      data: timeData,
+      axisLabel: {
+        rotate: 45,
+        formatter: (value: string) => {
+          return value.slice(11, 16); // 只显示时:分
+        }
+      }
     },
     yAxis: {
       type: 'value',
@@ -144,6 +190,7 @@ const MultiVarietyArbitrage: React.FC = () => {
       }
     },
     series: [{
+      name: '压榨利润',
       data: crushingMarginData,
       type: 'line',
       smooth: true,
@@ -233,13 +280,33 @@ const MultiVarietyArbitrage: React.FC = () => {
                 <li>压榨利润套利：当压榨利润（豆油+豆粕价格-大豆成本）偏离正常水平时，可通过多空组合对冲套利。</li>
               </ul>
               <br/>
-              <p><b style={{color: 'red'}}>本策略仅供参考，测试结果基于三个品种的2501合约5分钟行情数据，实际交易中请注意风险控制，建议使用模拟盘进行测试。</b></p>
+              <p><b style={{color: 'red'}}>本策略仅供参考，测试结果基于三个品种的2509合约5分钟行情数据，实际交易中请注意风险控制，建议使用模拟盘进行测试。</b></p>
             </div>
           }
           type="warning"
           showIcon
           className="mb-6"
         />
+
+        <Card className="mb-6">
+          <div className="flex items-center justify-between">
+            <Text strong>数据来源: 新浪财经期货行情</Text>
+            <div className="flex items-center gap-2">
+              <Text>实时数据</Text>
+              <Switch 
+                checked={isRealtime} 
+                onChange={(checked) => {
+                  setIsRealtime(checked);
+                  if (checked) {
+                    fetchData(); // 立即获取一次数据
+                  }
+                }}
+                checkedChildren="开启" 
+                unCheckedChildren="关闭"
+              />
+            </div>
+          </div>
+        </Card>
 
         <Spin spinning={loading}>
           <Tabs defaultActiveKey="1" type="card" className="bg-white rounded-lg shadow">
@@ -287,15 +354,15 @@ const MultiVarietyArbitrage: React.FC = () => {
                   <Paragraph>
                     <Text strong>触发条件：</Text>
                     <ul className="list-disc pl-6 mt-2">
-                      <li>当实时油粕比高于2.5或低于2.0时，视为短期超买/超卖信号</li>
+                      <li>当实时油粕比高于2.8或低于2.5时，视为短期超买/超卖信号</li>
                       <li>结合成交量放大（较前5分钟均值增长30%以上）确认趋势有效性</li>
                     </ul>
                   </Paragraph>
                   <Paragraph>
                     <Text strong>操作方向：</Text>
                     <ul className="list-disc pl-6 mt-2">
-                      <li>比值高位（{'>'}2.5）：做空油粕比（卖出豆油、买入豆粕）</li>
-                      <li>比值低位（{'<'}2.0）：做多油粕比（买入豆油、卖出豆粕）</li>
+                      <li>比值高位（{'>'}2.8）：做空油粕比（卖出豆油、买入豆粕）</li>
+                      <li>比值低位（{'<'}2.5）：做多油粕比（买入豆油、卖出豆粕）</li>
                     </ul>
                   </Paragraph>
                 </Card>
@@ -322,6 +389,7 @@ const MultiVarietyArbitrage: React.FC = () => {
                       <Statistic
                         title="历史均值"
                         value={historicalAverage}
+                        precision={0}
                         prefix="¥"
                         suffix="/吨"
                       />

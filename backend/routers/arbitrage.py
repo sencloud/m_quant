@@ -168,21 +168,48 @@ async def get_realtime_arbitrage():
         m_data = load_kline_data('M2501.DCE')  # 豆粕
         b_data = load_kline_data('B2501.DCE')  # 豆二
         logger.info("K线数据加载完成")
+
+        # 确保所有数据框的索引一致
+        common_index = y_data.index.intersection(m_data.index).intersection(b_data.index)
+        y_data = y_data.loc[common_index]
+        m_data = m_data.loc[common_index]
+        b_data = b_data.loc[common_index]
         
         # 计算油粕比
         logger.info("开始计算油粕比")
-        oil_meal_ratio = calculate_oil_meal_ratio(y_data, m_data)
-        logger.info("油粕比计算完成")
+        ratio = y_data['close'] / m_data['close']
+        latest_ratio = ratio.iloc[-1]
         
         # 计算压榨利润
         logger.info("开始计算压榨利润")
-        crushing_margin = calculate_crushing_margin(y_data, m_data, b_data)
-        logger.info("压榨利润计算完成")
+        margin = y_data['close'] * 0.18 + m_data['close'] * 0.8 - b_data['close']
+        historical_avg = margin.rolling(window=5*48).mean().iloc[-1]
+        latest_margin = margin.iloc[-1]
+        
+        # 准备时间序列数据
+        timestamps = [ts.strftime('%Y-%m-%d %H:%M:%S') for ts in common_index]
         
         logger.info("数据处理完成，准备返回结果")
         return {
-            "oil_meal_ratio": oil_meal_ratio,
-            "crushing_margin": crushing_margin
+            "timestamps": timestamps,
+            "oil_meal_ratio": {
+                "current_ratio": latest_ratio,
+                "values": ratio.tolist(),
+                "thresholds": {
+                    "upper": 2.5,
+                    "lower": 2.0
+                }
+            },
+            "crushing_margin": {
+                "current_margin": latest_margin,
+                "historical_average": historical_avg,
+                "values": margin.tolist()
+            },
+            "raw_data": {
+                "soybean_oil": y_data['close'].tolist(),
+                "soybean_meal": m_data['close'].tolist(),
+                "soybean": b_data['close'].tolist()
+            }
         }
     except Exception as e:
         logger.error("处理实时套利数据请求失败", exc_info=True)

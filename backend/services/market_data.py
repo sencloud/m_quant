@@ -1464,4 +1464,58 @@ class MarketDataService:
             logger.error(f"获取事件价格数据失败: {str(e)}")
             import traceback
             logger.error(f"错误堆栈: {traceback.format_exc()}")
-            return [] 
+            return []
+
+    def get_realtime_arbitrage_data(self) -> dict:
+        """获取实时套利数据"""
+        try:
+            # 获取三个品种的5分钟数据
+            soybean_df = ak.futures_zh_minute_sina(symbol="B2509", period="5")  # 豆二
+            meal_df = ak.futures_zh_minute_sina(symbol="M2509", period="5")     # 豆粕
+            oil_df = ak.futures_zh_minute_sina(symbol="Y2509", period="5")      # 豆油
+
+            # 重置索引，将datetime列变成普通列
+            soybean_df = soybean_df.reset_index()
+            meal_df = meal_df.reset_index()
+            oil_df = oil_df.reset_index()
+
+            # 确保时间对齐
+            timestamps = sorted(set(soybean_df['datetime']) & set(meal_df['datetime']) & set(oil_df['datetime']))
+            
+            # 过滤数据
+            soybean_df = soybean_df[soybean_df['datetime'].isin(timestamps)]
+            meal_df = meal_df[meal_df['datetime'].isin(timestamps)]
+            oil_df = oil_df[oil_df['datetime'].isin(timestamps)]
+            
+            # 计算油粕比
+            oil_prices = oil_df['close'].values
+            meal_prices = meal_df['close'].values
+            oil_meal_ratio = oil_prices / meal_prices
+            
+            # 计算压榨利润
+            soybean_prices = soybean_df['close'].values
+            crushing_margin = (oil_prices * 0.18 + meal_prices * 0.8) - soybean_prices
+            
+            # 计算历史均值（这里用最近20个周期的均值）
+            historical_average = np.mean(crushing_margin[-20:])
+
+            return {
+                "timestamps": timestamps,
+                "oil_meal_ratio": {
+                    "current_ratio": float(oil_meal_ratio[-1]),
+                    "values": oil_meal_ratio.tolist()
+                },
+                "crushing_margin": {
+                    "current_margin": float(crushing_margin[-1]),
+                    "historical_average": float(historical_average),
+                    "values": crushing_margin.tolist()
+                },
+                "raw_data": {
+                    "soybean": soybean_prices.tolist(),
+                    "meal": meal_prices.tolist(),
+                    "oil": oil_prices.tolist()
+                }
+            }
+        except Exception as e:
+            logger.error(f"获取实时套利数据失败: {str(e)}")
+            raise 
