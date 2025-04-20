@@ -146,7 +146,8 @@ class ContractStats(BaseModel):
     start_price: float
     end_price: float
     volatility_30d: float  # 30日波动率
-    quantile_coef: float  # 新增：分位系数 = 最低价/开始价格
+    quantile_coef: float  # 分位系数 = 最低价/开始价格
+    standardized_value: float  # 标准化值 = (当前价-最低价)/(最高价-最低价)
 
 class PriceRangeAnalysis(BaseModel):
     bottom_price: float
@@ -158,17 +159,38 @@ class PriceRangeAnalysis(BaseModel):
     avg_bottom_duration: float
     historical_bottoms: List[HistoricalBottom]
     contract_stats: List[ContractStats]
-    price_quartiles: dict = Field(  # 新增：价格分位数
+    price_quartiles: dict = Field(  # 价格分位数
         default_factory=lambda: {
             'q1': 0.0,
             'q2': 0.0,
             'q3': 0.0
         }
     )
-    volatility_quartiles: dict = Field(  # 新增：波动率分位数
+    volatility_quartiles: dict = Field(  # 波动率分位数
         default_factory=lambda: {
             'q1': 0.0,
             'q2': 0.0,
             'q3': 0.0
+        }
+    )
+    cycle_analysis: dict = Field(  # 周期性分析
+        default_factory=lambda: {
+            'cycle_length': 4,  # 周期长度（年）
+            'last_bottom_year': 2020,  # 上一个周期底部年份
+            'next_bottom_year': 2024,  # 预测下一个周期底部年份
+            'current_phase': 'late',  # 当前所处周期阶段 early/mid/late
+        }
+    )
+    predicted_low: dict = Field(  # 低点预测
+        default_factory=lambda: {
+            'base': 0.0,  # 基准预测值
+            'lower': 0.0,  # 下限
+            'upper': 0.0,  # 上限
+            'confidence': 0.0,  # 预测置信度
+            'factors': {  # 影响因子
+                'supply_pressure': 0.0,  # 供应压力
+                'policy_risk': 0.0,  # 政策风险
+                'basis_impact': 0.0,  # 基差影响
+            }
         }
     ) 

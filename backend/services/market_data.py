@@ -1801,7 +1801,8 @@ class MarketDataService:
                     start_price=float(valid_df['open'].iloc[0]),
                     end_price=float(valid_df['close'].iloc[-1]),
                     volatility_30d=volatility_30d,
-                    quantile_coef=float(valid_df['low'].min()) / float(valid_df['open'].iloc[0])  # 新增：分位系数计算
+                    quantile_coef=float(valid_df['low'].min()) / float(valid_df['open'].iloc[0]),  # 分位系数计算
+                    standardized_value=0.0  # 初始化为0，后面会更新
                 )
                 contract_stats.append(contract_stat)
 
@@ -1822,6 +1823,83 @@ class MarketDataService:
                 'q3': float(np.percentile(all_volatilities, 75))
             }
 
+            # 计算标准化指标
+            historical_min = min(stat.lowest_price for stat in contract_stats)
+            historical_max = max(stat.highest_price for stat in contract_stats)
+            
+            self.logger.info(f"历史最低价: {historical_min}, 历史最高价: {historical_max}")
+            
+            for stat in contract_stats:
+                if historical_max != historical_min:  # 避免除以零
+                    stat.standardized_value = (stat.end_price - historical_min) / (historical_max - historical_min)
+                    self.logger.debug(f"合约 {stat.contract} 标准化值: {stat.standardized_value:.4f}, 结束价: {stat.end_price}")
+                else:
+                    stat.standardized_value = 0.0
+                    self.logger.warning(f"历史最高价等于最低价，合约 {stat.contract} 标准化值设为0")
+
+            # 计算低点预测
+            if not contract_stats:
+                self.logger.warning(f"没有找到任何合约统计数据")
+                return PriceRangeAnalysis(
+                    bottom_price=0.0,
+                    current_price=0.0,
+                    bottom_range_start=0.0,
+                    bottom_range_end=0.0,
+                    bounce_success_rate=0.0,
+                    avg_bounce_amplitude=0.0,
+                    avg_bottom_duration=0.0,
+                    historical_bottoms=[],
+                    contract_stats=[],
+                    price_quartiles={'q1': 0.0, 'q2': 0.0, 'q3': 0.0},
+                    volatility_quartiles={'q1': 0.0, 'q2': 0.0, 'q3': 0.0},
+                    predicted_low={
+                        'base': 0.0,
+                        'lower': 0.0,
+                        'upper': 0.0,
+                        'confidence': 0.0,
+                        'factors': {
+                            'supply_pressure': 0.0,
+                            'policy_risk': 0.0,
+                            'basis_impact': 0.0
+                        }
+                    }
+                )
+
+            # 修改合约匹配逻辑
+            month = contract[1:3]  # 获取月份部分 (01, 05, 09)
+            matching_stats = [s for s in contract_stats if s.contract.endswith(month)]
+            self.logger.info(f"为合约 {contract} 查找匹配的月份 {month}, 找到 {len(matching_stats)} 个匹配合约")
+            
+            if not matching_stats:
+                self.logger.warning(f"没有找到匹配的合约统计数据: {contract}")
+                current_stat = contract_stats[0]  # 使用第一个合约的数据
+                self.logger.info(f"使用默认合约 {current_stat.contract} 的数据进行预测")
+            else:
+                current_stat = matching_stats[-1]  # 使用最新的匹配合约
+                self.logger.info(f"使用匹配合约 {current_stat.contract} 的数据进行预测")
+
+            base_coef = 0.8  # 基础分位系数
+            base_prediction = current_stat.start_price * base_coef
+            self.logger.info(f"基础预测: {base_prediction}, 开始价格: {current_stat.start_price}, 基础系数: {base_coef}")
+            
+            # 根据合约类型调整修正因子
+            supply_pressure = -0.05 if contract[1:3] == '05' else 0  # 5月合约供应压力
+            policy_risk = 0.03 if contract[1:3] == '09' else 0  # 9月合约政策风险
+            self.logger.info(f"合约调整因子 - 供应压力: {supply_pressure}, 政策风险: {policy_risk}")
+            
+            predicted_low = {
+                'base': base_prediction,
+                'lower': base_prediction * (1 + supply_pressure),
+                'upper': base_prediction * (1 + policy_risk),
+                'confidence': 0.8 - abs(supply_pressure) - abs(policy_risk),  # 置信度随修正幅度降低
+                'factors': {
+                    'supply_pressure': supply_pressure,
+                    'policy_risk': policy_risk,
+                    'basis_impact': 0.0  # 移除基差影响
+                }
+            }
+            self.logger.info(f"预测低点 - 基础: {predicted_low['base']}, 下限: {predicted_low['lower']}, 上限: {predicted_low['upper']}, 置信度: {predicted_low['confidence']}")
+
             return PriceRangeAnalysis(
                 bottom_price=float(bottom_price),
                 current_price=float(current_price),
@@ -1833,9 +1911,12 @@ class MarketDataService:
                 historical_bottoms=historical_bottoms,
                 contract_stats=contract_stats,
                 price_quartiles=price_quartiles,
-                volatility_quartiles=volatility_quartiles
+                volatility_quartiles=volatility_quartiles,
+                predicted_low=predicted_low
             )
             
         except Exception as e:
             logger.error(f"计算价格区间分析失败: {str(e)}")
+            import traceback
+            logger.error(f"错误堆栈: {traceback.format_exc()}")
             raise

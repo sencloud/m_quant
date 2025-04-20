@@ -9,6 +9,7 @@ import * as echarts from 'echarts';
 import { HeatMapOutlined, LineChartOutlined, HistoryOutlined, AreaChartOutlined } from '@ant-design/icons';
 import MDEditor from '@uiw/react-md-editor';
 import { EChartsOption } from 'echarts';
+import StandardizedAnalysis from '../components/analysis/StandardizedAnalysis';
 
 interface KeyEvent {
   date: string;
@@ -1751,7 +1752,10 @@ const ProAnalysis: React.FC = () => {
                           </div>
                         </div>
                       </div>
-
+                      <StandardizedAnalysis 
+                        contractStats={priceRangeData?.contract_stats || []}
+                        selectedContract={selectedContract}
+                      />
                       <div className="mb-8 bg-white rounded-lg shadow">
                         <div className="p-6">
                           <h3 className="text-lg font-semibold text-gray-900 mb-4">合约价格统计</h3>
