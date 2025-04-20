@@ -145,6 +145,8 @@ class ContractStats(BaseModel):
     price_range: float
     start_price: float
     end_price: float
+    volatility_30d: float  # 30日波动率
+    quantile_coef: float  # 新增：分位系数 = 最低价/开始价格
 
 class PriceRangeAnalysis(BaseModel):
     bottom_price: float
@@ -155,4 +157,18 @@ class PriceRangeAnalysis(BaseModel):
     avg_bounce_amplitude: float
     avg_bottom_duration: float
     historical_bottoms: List[HistoricalBottom]
-    contract_stats: List[ContractStats]  # 添加合约统计信息字段 
+    contract_stats: List[ContractStats]
+    price_quartiles: dict = Field(  # 新增：价格分位数
+        default_factory=lambda: {
+            'q1': 0.0,
+            'q2': 0.0,
+            'q3': 0.0
+        }
+    )
+    volatility_quartiles: dict = Field(  # 新增：波动率分位数
+        default_factory=lambda: {
+            'q1': 0.0,
+            'q2': 0.0,
+            'q3': 0.0
+        }
+    ) 

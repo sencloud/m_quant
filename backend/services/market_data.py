@@ -5,7 +5,7 @@ import akshare as ak
 from datetime import datetime, timedelta
 from typing import List, Optional, Dict
 from config import settings
-from models.market_data import FuturesData, ETFData, OptionsData, PriceRangeAnalysis, KlineData, HistoricalBottom
+from models.market_data import FuturesData, ETFData, OptionsData, PriceRangeAnalysis, KlineData, HistoricalBottom, ContractStats
 from utils.logger import logger
 import time
 import threading
@@ -1767,6 +1767,9 @@ class MarketDataService:
             
             # 计算每个合约的价格统计
             contract_stats = []
+            all_prices = []  # 收集所有价格用于计算分位数
+            all_volatilities = []  # 收集所有波动率用于计算分位数
+            
             for contract_code, contract_df in contract_groups:
                 # 确保数据按日期排序
                 contract_df = contract_df.sort_values('trade_date').reset_index(drop=True)
@@ -1780,19 +1783,44 @@ class MarketDataService:
                 if len(valid_df) < 60:  # 确保过滤后仍有足够数据
                     continue
 
+                # 计算30日波动率
+                returns = valid_df['close'].pct_change()
+                volatility_series = returns.rolling(window=30).std()
+                volatility_30d = float(volatility_series.iloc[-1] if not volatility_series.empty else 0) * np.sqrt(252) * 100
+                
+                # 收集所有价格和波动率数据
+                all_prices.extend([float(x) for x in valid_df['close'].values])
+                all_volatilities.extend([float(x) for x in volatility_series.dropna().values])
+
                 # 计算统计数据
-                contract_stat = {
-                    'contract': str(contract_code.split('.')[0]),  # 去掉.DCE后缀
-                    'lowest_price': float(valid_df['low'].min()),
-                    'highest_price': float(valid_df['high'].max()),
-                    'price_range': float(valid_df['high'].max() - valid_df['low'].min()),
-                    'start_price': float(valid_df['open'].iloc[0]),
-                    'end_price': float(valid_df['close'].iloc[-1])
-                }
+                contract_stat = ContractStats(
+                    contract=str(contract_code.split('.')[0]),  # 去掉.DCE后缀
+                    lowest_price=float(valid_df['low'].min()),
+                    highest_price=float(valid_df['high'].max()),
+                    price_range=float(valid_df['high'].max() - valid_df['low'].min()),
+                    start_price=float(valid_df['open'].iloc[0]),
+                    end_price=float(valid_df['close'].iloc[-1]),
+                    volatility_30d=volatility_30d,
+                    quantile_coef=float(valid_df['low'].min()) / float(valid_df['open'].iloc[0])  # 新增：分位系数计算
+                )
                 contract_stats.append(contract_stat)
 
             # 按合约代码排序
-            contract_stats.sort(key=lambda x: x['contract'])
+            contract_stats.sort(key=lambda x: x.contract)
+            
+            # 计算价格分位数
+            price_quartiles = {
+                'q1': float(np.percentile(all_prices, 25)),
+                'q2': float(np.percentile(all_prices, 50)),
+                'q3': float(np.percentile(all_prices, 75))
+            }
+            
+            # 计算波动率分位数
+            volatility_quartiles = {
+                'q1': float(np.percentile(all_volatilities, 25)),
+                'q2': float(np.percentile(all_volatilities, 50)),
+                'q3': float(np.percentile(all_volatilities, 75))
+            }
 
             return PriceRangeAnalysis(
                 bottom_price=float(bottom_price),
@@ -1803,8 +1831,11 @@ class MarketDataService:
                 avg_bounce_amplitude=float(avg_bounce_amplitude),
                 avg_bottom_duration=int(avg_bottom_duration),
                 historical_bottoms=historical_bottoms,
-                contract_stats=contract_stats  # 添加合约统计信息
+                contract_stats=contract_stats,
+                price_quartiles=price_quartiles,
+                volatility_quartiles=volatility_quartiles
             )
+            
         except Exception as e:
             logger.error(f"计算价格区间分析失败: {str(e)}")
             raise

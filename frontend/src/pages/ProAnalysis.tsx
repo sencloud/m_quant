@@ -80,7 +80,19 @@ interface PriceRangeData {
     price_range: number;
     start_price: number;
     end_price: number;
+    volatility_30d: number;  // 新增：30日波动率
+    quantile_coef: number;  // 新增：分位系数
   }[];
+  price_quartiles: {  // 新增：价格分位数
+    q1: number;
+    q2: number;
+    q3: number;
+  };
+  volatility_quartiles: {  // 新增：波动率分位数
+    q1: number;
+    q2: number;
+    q3: number;
+  };
 }
 
 type ContractType = 'M01' | 'M05' | 'M09';
@@ -1646,7 +1658,7 @@ const ProAnalysis: React.FC = () => {
                     <>
                       <div className="grid grid-cols-4 gap-4 mb-8">
                         <div className="bg-white rounded-lg shadow p-6">
-                          <div className="text-sm text-gray-500 mb-1">历史底部价格</div>
+                          <div className="text-sm text-gray-500 mb-1">历史最低价格</div>
                           <div className="text-2xl font-bold text-gray-900">
                             ¥{priceRangeData?.bottom_price.toFixed(2)}
                           </div>
@@ -1661,22 +1673,81 @@ const ProAnalysis: React.FC = () => {
                             ¥{priceRangeData?.current_price.toFixed(2)}
                           </div>
                         </div>
-                        {/* <div className="bg-white rounded-lg shadow p-6">
-                          <div className="text-sm text-gray-500 mb-1">反弹成功率</div>
-                          <div className="text-2xl font-bold text-gray-900">
-                            {priceRangeData?.bounce_success_rate.toFixed(2)}%
-                          </div>
-                          <div className="mt-2 h-2 bg-gray-200 rounded-full">
-                            <div 
-                              className="h-2 bg-gradient-to-r from-blue-500 to-green-500 rounded-full" 
-                              style={{ width: `${priceRangeData?.bounce_success_rate}%` }}
-                            />
-                          </div>
-                        </div> */}
                         <div className="bg-white rounded-lg shadow p-6">
                           <div className="text-sm text-gray-500 mb-1">平均反弹幅度</div>
                           <div className="text-2xl font-bold text-gray-900">
                             {priceRangeData?.avg_bounce_amplitude.toFixed(2)}%
+                          </div>
+                        </div>
+                        <div className="bg-white rounded-lg shadow p-6">
+                          <div className="text-sm text-gray-500 mb-1">平均停留时间</div>
+                          <div className="text-2xl font-bold text-gray-900">
+                            {priceRangeData?.avg_bottom_duration}天
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4 mb-8">
+                        <div className="bg-white rounded-lg shadow p-6">
+                          <h4 className="text-lg font-semibold text-gray-900 mb-4">价格分位数分析</h4>
+                          <div className="space-y-4">
+                            <div className="flex justify-between items-center">
+                              <span className="text-gray-600">25%分位数 (Q1)</span>
+                              <span className="text-lg font-medium text-blue-600">¥{priceRangeData?.price_quartiles.q1.toFixed(2)}</span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                              <span className="text-gray-600">中位数 (Q2)</span>
+                              <span className="text-lg font-medium text-blue-600">¥{priceRangeData?.price_quartiles.q2.toFixed(2)}</span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                              <span className="text-gray-600">75%分位数 (Q3)</span>
+                              <span className="text-lg font-medium text-blue-600">¥{priceRangeData?.price_quartiles.q3.toFixed(2)}</span>
+                            </div>
+                            <div className="mt-4 text-sm text-gray-500">
+                              Q1（{priceRangeData?.price_quartiles.q1.toFixed(0)}元）通常代表强支撑，
+                              Q3（{priceRangeData?.price_quartiles.q3.toFixed(0)}元）为弱支撑
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="bg-white rounded-lg shadow p-6">
+                          <h4 className="text-lg font-semibold text-gray-900 mb-4">波动率分析</h4>
+                          <div className="space-y-4">
+                            <div className="flex justify-between items-center">
+                              <span className="text-gray-600">当前30日波动率</span>
+                              <span className={`text-lg font-medium ${
+                                priceRangeData && priceRangeData.contract_stats[0] && priceRangeData.volatility_quartiles
+                                ? priceRangeData.contract_stats[0].volatility_30d <= priceRangeData.volatility_quartiles.q1
+                                  ? 'text-green-600'
+                                  : priceRangeData.contract_stats[0].volatility_30d >= priceRangeData.volatility_quartiles.q3
+                                  ? 'text-red-600'
+                                  : 'text-yellow-600'
+                                : 'text-gray-600'
+                              }`}>
+                                {priceRangeData?.contract_stats[0]?.volatility_30d?.toFixed(2)}%
+                              </span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                              <span className="text-gray-600">历史25%分位数</span>
+                              <span className="text-lg font-medium text-gray-600">{priceRangeData?.volatility_quartiles?.q1?.toFixed(2)}%</span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                              <span className="text-gray-600">历史中位数</span>
+                              <span className="text-lg font-medium text-gray-600">{priceRangeData?.volatility_quartiles?.q2?.toFixed(2)}%</span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                              <span className="text-gray-600">历史75%分位数</span>
+                              <span className="text-lg font-medium text-gray-600">{priceRangeData?.volatility_quartiles?.q3?.toFixed(2)}%</span>
+                            </div>
+                            <div className="mt-4 text-sm text-gray-500">
+                              {priceRangeData && priceRangeData.contract_stats[0] && priceRangeData.volatility_quartiles && (
+                                priceRangeData.contract_stats[0].volatility_30d <= priceRangeData.volatility_quartiles.q1
+                                ? '当前波动率处于历史25%分位数以下，表明价格处于低波动状态，底部可能临近'
+                                : priceRangeData.contract_stats[0].volatility_30d >= priceRangeData.volatility_quartiles.q3
+                                ? '当前波动率处于历史75%分位数以上，表明市场波动剧烈，需注意风险'
+                                : '当前波动率处于历史中位水平，市场运行平稳'
+                              )}
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -1689,32 +1760,60 @@ const ProAnalysis: React.FC = () => {
                               <thead className="bg-gray-50">
                                 <tr>
                                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">合约</th>
-                                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">最低价</th>
-                                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">最高价</th>
-                                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">价差</th>
                                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">合约开始价格</th>
                                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">合约结束价格</th>
+                                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">合约最高价</th>
+                                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">合约最低价</th>                                  
+                                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">高低价价差</th>
+                                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">价格分位系数(最低价相对开始价)</th>
                                 </tr>
                               </thead>
                               <tbody className="bg-white divide-y divide-gray-200">
-                                {priceRangeData?.contract_stats.map((stat, index) => (
-                                  <tr key={stat.contract} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{stat.contract}</td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">¥{stat.lowest_price.toFixed(2)}</td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">¥{stat.highest_price.toFixed(2)}</td>
-                                    <td className={`px-6 py-4 whitespace-nowrap text-sm ${
-                                      stat.price_range >= 1500 ? 'text-red-800 font-bold' :
-                                      stat.price_range >= 1200 ? 'text-red-600' :
-                                      stat.price_range >= 1000 ? 'text-red-400' :
-                                      stat.price_range <= 300 ? 'text-blue-800 font-bold' :
-                                      stat.price_range <= 400 ? 'text-blue-600' :
-                                      stat.price_range <= 500 ? 'text-blue-400' :
-                                      'text-gray-500'
-                                    }`}>¥{stat.price_range.toFixed(2)}</td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">¥{stat.start_price.toFixed(2)}</td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">¥{stat.end_price.toFixed(2)}</td>
-                                  </tr>
-                                ))}
+                                {priceRangeData?.contract_stats.map((stat, index) => {
+                                  // 找出最高价中的最大值和最低价中的最小值
+                                  const maxHighPrice = Math.max(...priceRangeData.contract_stats.map(s => s.highest_price));
+                                  const minLowPrice = Math.min(...priceRangeData.contract_stats.map(s => s.lowest_price));
+                                  
+                                  return (
+                                    <tr key={stat.contract} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{stat.contract}</td>
+                                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">¥{stat.start_price.toFixed(2)}</td>
+                                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">¥{stat.end_price.toFixed(2)}</td>
+                                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                        {stat.highest_price === maxHighPrice ? (
+                                          <Tag color="red">¥{stat.highest_price.toFixed(2)}</Tag>
+                                        ) : (
+                                          `¥${stat.highest_price.toFixed(2)}`
+                                        )}
+                                      </td>
+                                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                        {stat.lowest_price === minLowPrice ? (
+                                          <Tag color="blue">¥{stat.lowest_price.toFixed(2)}</Tag>
+                                        ) : (
+                                          `¥${stat.lowest_price.toFixed(2)}`
+                                        )}
+                                      </td>
+                                      <td className={`px-6 py-4 whitespace-nowrap text-sm ${
+                                        stat.price_range >= 1500 ? 'text-red-800 font-bold' :
+                                        stat.price_range >= 1200 ? 'text-red-600' :
+                                        stat.price_range >= 1000 ? 'text-red-400' :
+                                        stat.price_range <= 300 ? 'text-blue-800 font-bold' :
+                                        stat.price_range <= 400 ? 'text-blue-600' :
+                                        stat.price_range <= 500 ? 'text-blue-400' :
+                                        'text-gray-500'
+                                      }`}>¥{stat.price_range.toFixed(2)}</td>
+                                      <td className={`px-6 py-4 whitespace-nowrap text-sm ${
+                                        stat.quantile_coef <= 0.7 ? 'text-red-800 font-bold' :
+                                        stat.quantile_coef <= 0.8 ? 'text-red-600' :
+                                        stat.quantile_coef <= 0.9 ? 'text-red-400' :
+                                        stat.quantile_coef >= 0.98 ? 'text-blue-800 font-bold' :
+                                        stat.quantile_coef >= 0.95 ? 'text-blue-600' :
+                                        stat.quantile_coef >= 0.92 ? 'text-blue-400' :
+                                        'text-gray-500'
+                                      }`}>{(stat.quantile_coef * 100).toFixed(2)}%</td>
+                                    </tr>
+                                  );
+                                })}
                               </tbody>
                             </table>
                           </div>
