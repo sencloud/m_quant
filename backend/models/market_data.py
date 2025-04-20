@@ -121,6 +121,23 @@ class CostComparisonData(BaseModel):
     price_diff: float  # 价差
     price_ratio: float  # 价格比
 
+class KlineData(BaseModel):
+    trade_date: str
+    open: float
+    high: float
+    low: float
+    close: float
+    vol: float
+
+class HistoricalBottom(BaseModel):
+    start_date: str
+    end_date: str
+    duration: int
+    bounce_amplitude: float
+    lowest_price: float
+    contract: str
+    kline_data: Optional[List[KlineData]]
+
 class PriceRangeAnalysis(BaseModel):
     bottom_price: float
     current_price: float
@@ -128,5 +145,5 @@ class PriceRangeAnalysis(BaseModel):
     bottom_range_end: float
     bounce_success_rate: float
     avg_bounce_amplitude: float
-    avg_bottom_duration: float  # 修改为float类型
-    historical_bottoms: List[dict]  # 历史底部区域记录 
+    avg_bottom_duration: float
+    historical_bottoms: List[HistoricalBottom] 

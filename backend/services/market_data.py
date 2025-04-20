@@ -5,7 +5,7 @@ import akshare as ak
 from datetime import datetime, timedelta
 from typing import List, Optional, Dict
 from config import settings
-from models.market_data import FuturesData, ETFData, OptionsData, PriceRangeAnalysis
+from models.market_data import FuturesData, ETFData, OptionsData, PriceRangeAnalysis, KlineData, HistoricalBottom
 from utils.logger import logger
 import time
 import threading
@@ -1650,7 +1650,6 @@ class MarketDataService:
             df = df.sort_values('trade_date')
             
             # 计算历史底部区域
-            window_size = 20  # 用于判断局部最低点的窗口大小
             historical_bottoms = []
             
             # 按合约分组处理数据
@@ -1660,70 +1659,120 @@ class MarketDataService:
                 # 确保数据按日期排序
                 contract_df = contract_df.sort_values('trade_date').reset_index(drop=True)
                 
-                # 只处理有足够数据的合约
-                if len(contract_df) < window_size * 2:
+                # 只处理有足够数据的合约（至少有60个交易日的数据）
+                if len(contract_df) < 60:
                     continue
                 
-                for i in range(window_size, len(contract_df) - window_size):
-                    # 判断是否是局部最低点
-                    current_price = contract_df['low'].iloc[i]
-                    window_before = contract_df['low'].iloc[i-window_size:i]
-                    window_after = contract_df['low'].iloc[i+1:i+window_size+1]
-                    
-                    if current_price <= window_before.min() and current_price <= window_after.min():
-                        # 找到底部区域的开始和结束日期
-                        start_idx = i
-                        while start_idx > 0 and contract_df['low'].iloc[start_idx-1] >= current_price:
-                            start_idx -= 1
-                            
-                        end_idx = i
-                        while end_idx < len(contract_df)-1 and contract_df['low'].iloc[end_idx+1] >= current_price:
-                            end_idx += 1
-                        
-                        # 计算反弹幅度 (使用之后20个交易日的最高价)
-                        bounce_amplitude = 0
-                        if end_idx + 20 < len(contract_df):
-                            max_price_after = contract_df['high'].iloc[end_idx+1:end_idx+21].max()
-                            if current_price > 0:  # 添加除零检查
-                                bounce_amplitude = (max_price_after - current_price) / current_price * 100
-                        
-                        historical_bottoms.append({
-                            "start_date": contract_df['trade_date'].iloc[start_idx].strftime("%Y%m%d"),
-                            "end_date": contract_df['trade_date'].iloc[end_idx].strftime("%Y%m%d"),
-                            "duration": end_idx - start_idx + 1,
-                            "bounce_amplitude": float(bounce_amplitude),  # 确保是Python原生float
-                            "lowest_price": float(current_price),  # 确保是Python原生float
-                            "contract": contract_code
-                        })
+                # 过滤掉价格为0或异常的数据
+                valid_df = contract_df[contract_df['low'] > 0]
+                if len(valid_df) < 60:  # 确保过滤后仍有足够数据
+                    continue
+                
+                # 根据合约类型剔除特定月份的数据
+                contract_month = contract_code.split('.')[0][-2:]  # 获取合约月份部分
+                if contract_month == "01":
+                    # 剔除1月份的数据
+                    valid_df = valid_df[valid_df['trade_date'].dt.month != 1]
+                elif contract_month == "05":
+                    # 剔除5月份的数据
+                    valid_df = valid_df[valid_df['trade_date'].dt.month != 5]
+                elif contract_month == "09":
+                    # 剔除9月份的数据
+                    valid_df = valid_df[valid_df['trade_date'].dt.month != 9]
+                
+                # 再次检查数据量是否足够
+                if len(valid_df) < 60:
+                    continue
+                
+                # 重置索引，确保索引连续
+                valid_df = valid_df.reset_index(drop=True)
+                
+                # 找出合约周期内的最低价格
+                min_price_idx = valid_df['low'].idxmin()
+                min_price = valid_df['low'].iloc[min_price_idx]
+                min_price_date = valid_df['trade_date'].iloc[min_price_idx]
+                
+                # 确定底部区域的开始和结束日期（最低价前后30个交易日）
+                start_idx = max(0, min_price_idx - 30)
+                end_idx = min(len(valid_df) - 1, min_price_idx + 30)
+                
+                # 计算底部区域的持续时间
+                duration = int(end_idx - start_idx + 1)  # 确保是int类型
+                
+                # 计算反弹幅度（使用底部区域之后的20个交易日的最高价）
+                bounce_amplitude = 0
+                if end_idx + 20 < len(valid_df):
+                    max_price_after = valid_df['high'].iloc[end_idx+1:end_idx+21].max()
+                    bounce_amplitude = (max_price_after - min_price) / min_price * 100
+                else:
+                    # 如果后续数据不足20个交易日，则使用所有可用的后续数据
+                    if end_idx + 1 < len(valid_df):
+                        max_price_after = valid_df['high'].iloc[end_idx+1:].max()
+                        bounce_amplitude = (max_price_after - min_price) / min_price * 100
+                    # 如果没有后续数据，则使用底部区域内的最高价作为反弹目标
+                    else:
+                        max_price_in_bottom = valid_df['high'].iloc[start_idx:end_idx+1].max()
+                        if max_price_in_bottom > min_price:  # 确保底部区域内有高于最低价的价格
+                            bounce_amplitude = (max_price_in_bottom - min_price) / min_price * 100
+                
+                # 获取完整的K线数据
+                kline_data = []
+                for _, row in valid_df.iterrows():
+                    kline_data.append(KlineData(
+                        trade_date=row['trade_date'].strftime('%Y%m%d'),
+                        open=float(row['open']),
+                        high=float(row['high']),
+                        low=float(row['low']),
+                        close=float(row['close']),
+                        vol=float(row['vol'])
+                    ))
+                
+                # 使用HistoricalBottom模型创建底部记录
+                historical_bottom = HistoricalBottom(
+                    start_date=valid_df['trade_date'].iloc[start_idx].strftime("%Y%m%d"),
+                    end_date=valid_df['trade_date'].iloc[end_idx].strftime("%Y%m%d"),
+                    duration=int(duration),
+                    bounce_amplitude=float(bounce_amplitude),
+                    lowest_price=float(min_price),
+                    contract=str(contract_code.split('.')[0]),
+                    kline_data=kline_data
+                )
+                
+                historical_bottoms.append(historical_bottom)
+                logger.info(f"找到合约 {contract_code} 的底部区域: 最低价 {min_price} 出现在 {min_price_date.strftime('%Y-%m-%d')}")
             
             if not historical_bottoms:
                 raise ValueError("未找到历史底部区域")
             
-            # 计算统计数据
-            bottom_prices = [b["lowest_price"] for b in historical_bottoms]
-            bottom_price = min(bottom_prices)
+            # 计算统计数据 - 历史底部最低价是所有合约的最低价
+            bottom_price = min([b.lowest_price for b in historical_bottoms])
             bottom_range_end = bottom_price * 1.2
             
             # 计算反弹成功率
-            successful_bounces = sum(1 for b in historical_bottoms if b["bounce_amplitude"] > 5)  # 反弹超过5%视为成功
+            successful_bounces = sum(1 for b in historical_bottoms if b.bounce_amplitude > 5)  # 反弹超过5%视为成功
             bounce_success_rate = (successful_bounces / len(historical_bottoms)) * 100 if historical_bottoms else 0
             
             # 计算平均反弹幅度和平均持续时间
-            avg_bounce_amplitude = sum(b["bounce_amplitude"] for b in historical_bottoms) / len(historical_bottoms) if historical_bottoms else 0
-            avg_bottom_duration = sum(b["duration"] for b in historical_bottoms) / len(historical_bottoms) if historical_bottoms else 0
+            avg_bounce_amplitude = sum(b.bounce_amplitude for b in historical_bottoms) / len(historical_bottoms) if historical_bottoms else 0
+            avg_bottom_duration = sum(b.duration for b in historical_bottoms) / len(historical_bottoms) if historical_bottoms else 0
             
             # 获取当前价格 (使用最新合约的收盘价)
-            latest_contract_data = df.sort_values('trade_date').iloc[-1]
+            # 确保数据有效且排序正确
+            valid_price_df = df[df['close'] > 0].sort_values('trade_date')
+            if len(valid_price_df) == 0:
+                raise ValueError("没有有效的价格数据")
+                
+            latest_contract_data = valid_price_df.iloc[-1]
             current_price = float(latest_contract_data['close'])
             
             return PriceRangeAnalysis(
-                bottom_price=float(bottom_price),  # 确保是Python原生float
-                current_price=float(current_price),  # 确保是Python原生float
-                bottom_range_start=float(bottom_price),  # 确保是Python原生float
-                bottom_range_end=float(bottom_range_end),  # 确保是Python原生float
-                bounce_success_rate=float(bounce_success_rate),  # 确保是Python原生float
-                avg_bounce_amplitude=float(avg_bounce_amplitude),  # 确保是Python原生float
-                avg_bottom_duration=float(avg_bottom_duration),  # 确保是Python原生float
+                bottom_price=float(bottom_price),
+                current_price=float(current_price),
+                bottom_range_start=float(bottom_price),
+                bottom_range_end=float(bottom_range_end),
+                bounce_success_rate=float(bounce_success_rate),
+                avg_bounce_amplitude=float(avg_bounce_amplitude),
+                avg_bottom_duration=int(avg_bottom_duration),
                 historical_bottoms=historical_bottoms
             )
         except Exception as e:

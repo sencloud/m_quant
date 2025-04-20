@@ -45,6 +45,25 @@ interface CostComparisonData {
   price_ratio: number;
 }
 
+interface HistoricalBottomKlineData {
+  trade_date: string;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  vol: number;
+}
+
+interface HistoricalBottom {
+  start_date: string;
+  end_date: string;
+  duration: number;
+  bounce_amplitude: number;
+  lowest_price: number;
+  contract: string;
+  kline_data?: HistoricalBottomKlineData[];
+}
+
 interface PriceRangeData {
   bottom_price: number;
   current_price: number;
@@ -53,14 +72,7 @@ interface PriceRangeData {
   bounce_success_rate: number;
   avg_bounce_amplitude: number;
   avg_bottom_duration: number;
-  historical_bottoms: Array<{
-    start_date: string;
-    end_date: string;
-    duration: number;
-    bounce_amplitude: number;
-    lowest_price: number;
-    contract: string;
-  }>;
+  historical_bottoms: HistoricalBottom[];
 }
 
 type ContractType = 'M01' | 'M05' | 'M09';
@@ -1119,6 +1131,224 @@ const ProAnalysis: React.FC = () => {
     };
   };
 
+  const getHistoricalBottomKlineOption = (bottomRecord: HistoricalBottom) => {
+    if (!bottomRecord.kline_data) return {};
+
+    // const dates = bottomRecord.kline_data.map(item => {
+    //   const date = item.trade_date;
+    //   return `${date.substring(0, 4)}-${date.substring(4, 6)}-${date.substring(6, 8)}`;
+    // });
+    const dates = bottomRecord.kline_data.map(item => item.trade_date);
+    const data = bottomRecord.kline_data.map(item => [
+      item.open,
+      item.close,
+      item.low,
+      item.high
+    ]);
+    const volumes = bottomRecord.kline_data.map(item => item.vol);
+
+    // Find the index range for the bottom area
+    const startIndex = dates.findIndex(date => date === bottomRecord.start_date);
+    const endIndex = dates.findIndex(date => date === bottomRecord.end_date);
+    
+    // Calculate the bounce end price (when price reached the highest point after bottom)
+    const bounceEndPrice = bottomRecord.lowest_price * (1 + bottomRecord.bounce_amplitude / 100);
+    
+    return {
+      tooltip: {
+        trigger: 'axis',
+        axisPointer: {
+          type: 'cross'
+        },
+        formatter: function(params: any) {
+          if (!params || params.length === 0) return '';
+          
+          // 检查是否是成交量区域
+          if (params[0].seriesName === '成交量') {
+            return `<div style="font-weight: bold; margin-bottom: 5px;">${params[0].axisValue}</div>
+                    <div>成交量: ${params[0].data}</div>`;
+          }
+          
+          // K线区域
+          const date = params[0].axisValue;
+          const klineData = params[0].data;
+          
+          let tooltipContent = `
+            <div style="font-weight: bold; margin-bottom: 5px;">${date}</div>
+            <div>开盘: ${klineData[1]}</div>
+            <div>收盘: ${klineData[2]}</div>
+            <div>最低: ${klineData[3]}</div>
+            <div>最高: ${klineData[4]}</div>
+          `;
+          
+          return tooltipContent;
+        }
+      },
+      legend: {
+        data: ['K线', '成交量'],
+        top: 0
+      },
+      grid: [
+        {
+          left: '5%',
+          right: '5%',
+          top: '10%',
+          height: '60%'
+        },
+        {
+          left: '5%',
+          right: '5%',
+          top: '75%',
+          height: '15%'
+        }
+      ],
+      xAxis: [
+        {
+          type: 'category',
+          data: dates,
+          scale: true,
+          boundaryGap: false,
+          axisLine: { onZero: false },
+          splitLine: { show: false },
+          splitNumber: 20,
+          min: 'dataMin',
+          max: 'dataMax',
+          axisLabel: {
+            formatter: (value: string) => {
+              return value.slice(0, 4) + '-' + value.slice(4, 6) + '-' + value.slice(6, 8);
+            }
+          }
+        },
+        {
+          type: 'category',
+          gridIndex: 1,
+          data: dates,
+          scale: true,
+          boundaryGap: false,
+          axisLine: { onZero: false },
+          axisTick: { show: false },
+          splitLine: { show: false },
+          axisLabel: { show: false },
+          splitNumber: 20,
+          min: 'dataMin',
+          max: 'dataMax'
+        }
+      ],
+      yAxis: [
+        {
+          scale: true,
+          splitArea: {
+            show: true
+          }
+        },
+        {
+          scale: true,
+          gridIndex: 1,
+          splitNumber: 2,
+          axisLabel: { show: false },
+          axisLine: { show: false },
+          axisTick: { show: false },
+          splitLine: { show: false }
+        }
+      ],
+      dataZoom: [
+        {
+          type: 'inside',
+          xAxisIndex: [0, 1],
+          start: 0,
+          end: 100
+        },
+        {
+          show: true,
+          xAxisIndex: [0, 1],
+          type: 'slider',
+          bottom: '0%',
+          start: 0,
+          end: 100
+        }
+      ],
+      series: [
+        {
+          name: 'K线',
+          type: 'candlestick',
+          data: data,
+          itemStyle: {
+            color: '#ef5350',
+            color0: '#26a69a',
+            borderColor: '#ef5350',
+            borderColor0: '#26a69a'
+          },
+          markArea: {
+            itemStyle: {
+              color: 'rgba(255, 173, 177, 0.3)'
+            },
+            data: [[
+              {
+                xAxis: dates[startIndex],
+                itemStyle: {
+                  color: 'rgba(255, 82, 82, 0.2)'
+                }
+              },
+              {
+                xAxis: dates[endIndex]
+              }
+            ]]
+          },
+          markLine: {
+            symbol: ['none', 'none'],
+            data: [
+              {
+                yAxis: bounceEndPrice,
+                lineStyle: {
+                  color: '#ff4081',
+                  type: 'dashed'
+                },
+                label: {
+                  show: true,
+                  position: 'middle',
+                  formatter: '反弹目标价: ' + bounceEndPrice.toFixed(2),
+                  backgroundColor: 'rgba(255, 64, 129, 0.8)',
+                  padding: [4, 8],
+                  borderRadius: 4,
+                  color: '#fff'
+                }
+              },
+              {
+                yAxis: bottomRecord.lowest_price,
+                lineStyle: {
+                  color: '#2196f3',
+                  type: 'dashed'
+                },
+                label: {
+                  show: true,
+                  position: 'middle',
+                  formatter: '最低价: ' + bottomRecord.lowest_price.toFixed(2),
+                  backgroundColor: 'rgba(33, 150, 243, 0.8)',
+                  padding: [4, 8],
+                  borderRadius: 4,
+                  color: '#fff'
+                }
+              }
+            ]
+          }
+        },
+        {
+          name: '成交量',
+          type: 'bar',
+          xAxisIndex: 1,
+          yAxisIndex: 1,
+          data: volumes,
+          itemStyle: {
+            color: function(params: any) {
+              const klineData = bottomRecord.kline_data![params.dataIndex];
+              return klineData.close >= klineData.open ? '#ef5350' : '#26a69a';
+            }
+          }
+        }
+      ]
+    };
+  };
+
   return (
     <Layout>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
@@ -1415,9 +1645,9 @@ const ProAnalysis: React.FC = () => {
                       <div className="bg-white rounded-lg shadow">
                         <div className="p-6">
                           <h3 className="text-lg font-semibold text-gray-900 mb-4">历史底部记录</h3>
-                          <div className="space-y-4">
+                          <div className="space-y-8">
                             {priceRangeData?.historical_bottoms.map((item, index) => (
-                              <div key={index} className="border-b border-gray-200 pb-4 last:border-b-0">
+                              <div key={index} className="border-b border-gray-200 pb-8 last:border-b-0">
                                 <div className="font-medium text-gray-900">
                                   {item.start_date.slice(0, 4)}-{item.start_date.slice(4, 6)}-{item.start_date.slice(6, 8)} 至 {item.end_date.slice(0, 4)}-{item.end_date.slice(4, 6)}-{item.end_date.slice(6, 8)}
                                 </div>
@@ -1434,6 +1664,12 @@ const ProAnalysis: React.FC = () => {
                                   <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
                                     反弹幅度: {item.bounce_amplitude.toFixed(2)}%
                                   </span>
+                                </div>
+                                <div className="mt-4" style={{ height: '400px' }}>
+                                  <ReactECharts
+                                    option={getHistoricalBottomKlineOption(item)}
+                                    style={{ height: '100%' }}
+                                  />
                                 </div>
                               </div>
                             ))}
