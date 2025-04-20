@@ -83,6 +83,7 @@ interface PriceRangeData {
     end_price: number;
     volatility_30d: number;  // 新增：30日波动率
     quantile_coef: number;  // 新增：分位系数
+    standardized_value: number;  // 新增：标准化值
   }[];
   price_quartiles: {  // 新增：价格分位数
     q1: number;
@@ -93,6 +94,17 @@ interface PriceRangeData {
     q1: number;
     q2: number;
     q3: number;
+  };
+  predicted_low?: {
+    base: number;
+    lower: number;
+    upper: number;
+    confidence: number;
+    factors: {
+      supply_pressure: number;
+      policy_risk: number;
+      basis_impact: number;
+    };
   };
 }
 
@@ -1657,38 +1669,38 @@ const ProAnalysis: React.FC = () => {
                     <Skeleton active />
                   ) : (
                     <>
-                      <div className="grid grid-cols-4 gap-4 mb-8">
-                        <div className="bg-white rounded-lg shadow p-6">
-                          <div className="text-sm text-gray-500 mb-1">历史最低价格</div>
-                          <div className="text-2xl font-bold text-gray-900">
-                            ¥{priceRangeData?.bottom_price.toFixed(2)}
-                          </div>
-                        </div>
-                        <div className="bg-white rounded-lg shadow p-6">
-                          <div className="text-sm text-gray-500 mb-1">当前价格</div>
-                          <div className={`text-2xl font-bold ${
-                            priceRangeData && priceRangeData.current_price <= priceRangeData.bottom_range_end 
-                            ? 'text-green-600' 
-                            : 'text-red-600'
-                          }`}>
-                            ¥{priceRangeData?.current_price.toFixed(2)}
-                          </div>
-                        </div>
-                        <div className="bg-white rounded-lg shadow p-6">
-                          <div className="text-sm text-gray-500 mb-1">平均反弹幅度</div>
-                          <div className="text-2xl font-bold text-gray-900">
-                            {priceRangeData?.avg_bounce_amplitude.toFixed(2)}%
-                          </div>
-                        </div>
-                        <div className="bg-white rounded-lg shadow p-6">
-                          <div className="text-sm text-gray-500 mb-1">平均停留时间</div>
-                          <div className="text-2xl font-bold text-gray-900">
-                            {priceRangeData?.avg_bottom_duration}天
-                          </div>
-                        </div>
-                      </div>
-
                       <div className="grid grid-cols-2 gap-4 mb-8">
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="bg-white rounded-lg shadow p-6">
+                            <div className="text-sm text-gray-500 mb-1">历史最低价格</div>
+                            <div className="text-2xl font-bold text-gray-900">
+                              ¥{priceRangeData?.bottom_price.toFixed(2)}
+                            </div>
+                          </div>
+                          <div className="bg-white rounded-lg shadow p-6">
+                            <div className="text-sm text-gray-500 mb-1">当前价格</div>
+                            <div className={`text-2xl font-bold ${
+                              priceRangeData && priceRangeData.current_price <= priceRangeData.bottom_range_end 
+                              ? 'text-green-600' 
+                              : 'text-red-600'
+                            }`}>
+                              ¥{priceRangeData?.current_price.toFixed(2)}
+                            </div>
+                          </div>
+                          <div className="bg-white rounded-lg shadow p-6">
+                            <div className="text-sm text-gray-500 mb-1">平均反弹幅度</div>
+                            <div className="text-2xl font-bold text-gray-900">
+                              {priceRangeData?.avg_bounce_amplitude.toFixed(2)}%
+                            </div>
+                          </div>
+                          <div className="bg-white rounded-lg shadow p-6">
+                            <div className="text-sm text-gray-500 mb-1">平均停留时间</div>
+                            <div className="text-2xl font-bold text-gray-900">
+                              {priceRangeData?.avg_bottom_duration}天
+                            </div>
+                          </div>
+                        </div>
+
                         <div className="bg-white rounded-lg shadow p-6">
                           <h4 className="text-lg font-semibold text-gray-900 mb-4">价格分位数分析</h4>
                           <div className="space-y-4">
@@ -1705,57 +1717,18 @@ const ProAnalysis: React.FC = () => {
                               <span className="text-lg font-medium text-blue-600">¥{priceRangeData?.price_quartiles.q3.toFixed(2)}</span>
                             </div>
                             <div className="mt-4 text-sm text-gray-500">
-                              Q1（{priceRangeData?.price_quartiles.q1.toFixed(0)}元）通常代表强支撑，
-                              Q3（{priceRangeData?.price_quartiles.q3.toFixed(0)}元）为弱支撑
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="bg-white rounded-lg shadow p-6">
-                          <h4 className="text-lg font-semibold text-gray-900 mb-4">波动率分析</h4>
-                          <div className="space-y-4">
-                            <div className="flex justify-between items-center">
-                              <span className="text-gray-600">当前30日波动率</span>
-                              <span className={`text-lg font-medium ${
-                                priceRangeData && priceRangeData.contract_stats[0] && priceRangeData.volatility_quartiles
-                                ? priceRangeData.contract_stats[0].volatility_30d <= priceRangeData.volatility_quartiles.q1
-                                  ? 'text-green-600'
-                                  : priceRangeData.contract_stats[0].volatility_30d >= priceRangeData.volatility_quartiles.q3
-                                  ? 'text-red-600'
-                                  : 'text-yellow-600'
-                                : 'text-gray-600'
-                              }`}>
-                                {priceRangeData?.contract_stats[0]?.volatility_30d?.toFixed(2)}%
-                              </span>
-                            </div>
-                            <div className="flex justify-between items-center">
-                              <span className="text-gray-600">历史25%分位数</span>
-                              <span className="text-lg font-medium text-gray-600">{priceRangeData?.volatility_quartiles?.q1?.toFixed(2)}%</span>
-                            </div>
-                            <div className="flex justify-between items-center">
-                              <span className="text-gray-600">历史中位数</span>
-                              <span className="text-lg font-medium text-gray-600">{priceRangeData?.volatility_quartiles?.q2?.toFixed(2)}%</span>
-                            </div>
-                            <div className="flex justify-between items-center">
-                              <span className="text-gray-600">历史75%分位数</span>
-                              <span className="text-lg font-medium text-gray-600">{priceRangeData?.volatility_quartiles?.q3?.toFixed(2)}%</span>
-                            </div>
-                            <div className="mt-4 text-sm text-gray-500">
-                              {priceRangeData && priceRangeData.contract_stats[0] && priceRangeData.volatility_quartiles && (
-                                priceRangeData.contract_stats[0].volatility_30d <= priceRangeData.volatility_quartiles.q1
-                                ? '当前波动率处于历史25%分位数以下，表明价格处于低波动状态，底部可能临近'
-                                : priceRangeData.contract_stats[0].volatility_30d >= priceRangeData.volatility_quartiles.q3
-                                ? '当前波动率处于历史75%分位数以上，表明市场波动剧烈，需注意风险'
-                                : '当前波动率处于历史中位水平，市场运行平稳'
-                              )}
+                              Q1（{priceRangeData?.price_quartiles.q1.toFixed(0)}元）价格附近区域通常代表底部区域
                             </div>
                           </div>
                         </div>
                       </div>
-                      <StandardizedAnalysis 
-                        contractStats={priceRangeData?.contract_stats || []}
-                        selectedContract={selectedContract}
-                      />
+                      <div className="mb-8">
+                        <StandardizedAnalysis 
+                          contractStats={priceRangeData?.contract_stats || []}
+                          selectedContract={selectedContract}
+                          predictedLow={priceRangeData?.predicted_low}
+                        />
+                      </div>
                       <div className="mb-8 bg-white rounded-lg shadow">
                         <div className="p-6">
                           <h3 className="text-lg font-semibold text-gray-900 mb-4">合约价格统计</h3>

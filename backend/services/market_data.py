@@ -1878,24 +1878,27 @@ class MarketDataService:
                 current_stat = matching_stats[-1]  # 使用最新的匹配合约
                 self.logger.info(f"使用匹配合约 {current_stat.contract} 的数据进行预测")
 
-            base_coef = 0.8  # 基础分位系数
+            # 计算平均分位系数作为基础系数
+            base_coef = sum(stat.quantile_coef for stat in matching_stats) / len(matching_stats) if matching_stats else 0.8
+            self.logger.info(f"计算得到的平均分位系数: {base_coef:.2f}")
+            
             base_prediction = current_stat.start_price * base_coef
-            self.logger.info(f"基础预测: {base_prediction}, 开始价格: {current_stat.start_price}, 基础系数: {base_coef}")
+            self.logger.info(f"基础预测: {base_prediction:.2f}, 开始价格: {current_stat.start_price}, 基础系数: {base_coef:.2f}")
             
             # 根据合约类型调整修正因子
-            supply_pressure = -0.05 if contract[1:3] == '05' else 0  # 5月合约供应压力
+            supply_pressure = -0.05 if contract[1:3] == '05' else (-0.1 if contract[1:3] == '01' else 0)  # 5月合约供应压力，1月合约设为0.1
             policy_risk = 0.03 if contract[1:3] == '09' else 0  # 9月合约政策风险
-            self.logger.info(f"合约调整因子 - 供应压力: {supply_pressure}, 政策风险: {policy_risk}")
+            self.logger.info(f"合约调整因子 - 供应压力: {supply_pressure:.2f}, 政策风险: {policy_risk:.2f}")
             
             predicted_low = {
-                'base': base_prediction,
-                'lower': base_prediction * (1 + supply_pressure),
-                'upper': base_prediction * (1 + policy_risk),
-                'confidence': 0.8 - abs(supply_pressure) - abs(policy_risk),  # 置信度随修正幅度降低
+                'base': round(base_prediction, 0),
+                'lower': round(base_prediction * (1 + supply_pressure), 0),
+                'upper': round(base_prediction * (1 + policy_risk), 0),
+                'confidence': round(0.8 - abs(supply_pressure) - abs(policy_risk), 2),  # 置信度随修正幅度降低
                 'factors': {
-                    'supply_pressure': supply_pressure,
-                    'policy_risk': policy_risk,
-                    'basis_impact': 0.0  # 移除基差影响
+                    'supply_pressure': round(abs(supply_pressure) if supply_pressure < 0 else 0, 2),  # 转换为正值表示压力
+                    'policy_risk': round(abs(policy_risk) if policy_risk > 0 else 0, 2),  # 保持正值表示风险
+                    'basis_impact': round(abs(1 - base_coef) if base_coef < 1 else 0, 2)  # 基差影响用分位系数偏离度表示
                 }
             }
             self.logger.info(f"预测低点 - 基础: {predicted_low['base']}, 下限: {predicted_low['lower']}, 上限: {predicted_low['upper']}, 置信度: {predicted_low['confidence']}")
