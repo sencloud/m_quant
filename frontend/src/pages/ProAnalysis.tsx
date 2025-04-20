@@ -73,6 +73,14 @@ interface PriceRangeData {
   avg_bounce_amplitude: number;
   avg_bottom_duration: number;
   historical_bottoms: HistoricalBottom[];
+  contract_stats: {
+    contract: string;
+    lowest_price: number;
+    highest_price: number;
+    price_range: number;
+    start_price: number;
+    end_price: number;
+  }[];
 }
 
 type ContractType = 'M01' | 'M05' | 'M09';
@@ -1542,32 +1550,79 @@ const ProAnalysis: React.FC = () => {
                         />
                       </div>
                       <div className="mt-8 prose max-w-none">
-                        <div className="markdown-content" data-color-mode="light" style={{
-                          backgroundColor: 'white',
-                          padding: '20px'
-                        }}>
-                          <MDEditor.Markdown 
-                            source={`
-### 豆粕成本与期货价格关系分析
-
-1. **价差分析**
-   - 正价差（成本价高于期货价）表明现货市场供应偏紧或需求旺盛
-   - 负价差（成本价低于期货价）表明期货市场看涨预期较强
-
-2. **价格比分析**
-   - 价格比>1表示成本价高于期货价，可能存在套利机会
-   - 价格比<1表示期货价高于成本价，需警惕价格回归风险
-
-3. **市场启示**
-   - 当价差和价格比处于历史极值时，往往预示着市场拐点
-   - 可结合基本面和技术面指标，综合判断市场走势
-                          `}
-                            style={{
-                              fontSize: '14px',
-                              lineHeight: '1.6',
-                              color: '#333'
-                            }}
-                          />
+                        <div className="space-y-6">
+                          {selectedContract === 'M01' ? (
+                            <>
+                              <div>
+                                <h4 className="text-lg font-semibold text-gray-900">极端波动合约分析</h4>
+                                <p className="mt-2">
+                                  <span className="font-medium">M2301合约</span>（2023年1月）价差高达1724元，创历史最大波动幅度。这与2023年全球大豆供应链扰动、厄尔尼诺天气炒作及外资资本操作密切相关。例如，2023年6-8月外资推动豆粕期货从3339元暴涨至5000元，引发贸易商踩踏式抛售，导致基差从800点暴跌至负值。
+                                </p>
+                                <p className="mt-2">
+                                  <span className="font-medium">M1301合约</span>（2013年1月）价差1445元，对应2012年美国干旱引发的全球大豆供应危机，推动豆粕价格突破4200元/吨的历史高位。
+                                </p>
+                              </div>
+                              
+                              <div>
+                                <h4 className="text-lg font-semibold text-gray-900">周期性波动验证</h4>
+                                <p className="mt-2">
+                                  从合约M1201（2012年）到M2501（2025年），豆粕价格呈现明显的4年大周期规律：
+                                </p>
+                                <div className="mt-2 space-y-2">
+                                  <p>
+                                    <span className="font-medium">高点年份</span>：2012年（3565元）、2016年（2926元）、2022年（4408元）、2026年（预测）
+                                  </p>
+                                  <p>
+                                    <span className="font-medium">低点年份</span>：2015年（2265元）、2020年（3140元）、2024年（2609元）
+                                  </p>
+                                </div>
+                              </div>
+                            </>
+                          ) : selectedContract === 'M05' ? (
+                            <>
+                              <div>
+                                <h4 className="text-lg font-semibold text-gray-900">价格波动与周期规律</h4>
+                                <p className="mt-2">
+                                  <span className="font-medium">极端波动案例</span>：M2205合约价差达1605元（最高4495元/最低2890元），对应2022年南美干旱引发的全球大豆供应危机。当前M2505合约价差736元（最高3285元/最低2549元），波动幅度较前两年收窄，反映市场对南美丰产预期的压制作用。
+                                </p>
+                                <p className="mt-2">
+                                  <span className="font-medium">周期性低点验证</span>：05合约历史最低价多集中于2500-2600元区间（如M1605最低2246元、M2005最低2515元），与豆粕长期成本支撑位（3150-3250元压榨盈亏线）存在约20%的安全边际。
+                                </p>
+                              </div>
+                              
+                              <div>
+                                <h4 className="text-lg font-semibold text-gray-900">交割月特性</h4>
+                                <p className="mt-2">
+                                  <span className="font-medium">供应压力集中</span>：05合约交割期（5月）通常对应南美大豆集中到港（如2025年4-6月预计到港2400万吨），导致M2505结束价（2857元）较开始价（3285元）下跌13%。
+                                </p>
+                                <p className="mt-2">
+                                  <span className="font-medium">基差收敛逻辑</span>：近月合约易受现货抛压影响，例如2025年3月广东现货跌至3400元/吨，而M2505同期在2900元附近震荡，基差率从15%缩窄至6.95%
+                                </p>
+                              </div>
+                            </>
+                          ) : (
+                            <>
+                              <div>
+                                <h4 className="text-lg font-semibold text-gray-900">政策敏感性与天气溢价</h4>
+                                <p className="mt-2">
+                                  <span className="font-medium">中美博弈窗口</span>：09合约覆盖北美大豆种植关键期（6-8月），价格易受美豆面积报告（3月底）及关税政策扰动。例如M2209合约价差2057元（最高5030元），对应2022年中美贸易摩擦升级引发的进口成本跳涨。
+                                </p>
+                                <p className="mt-2">
+                                  <span className="font-medium">天气炒作空间</span>：历史数据显示09合约最大价差达2057元（M2209），当前M2509价差仅451元（最高3168元/最低2717元），若美豆种植遭遇干旱，潜在上涨空间超过500元。
+                                </p>
+                              </div>
+                              
+                              <div>
+                                <h4 className="text-lg font-semibold text-gray-900">需求旺季支撑</h4>
+                                <p className="mt-2">
+                                  <span className="font-medium">养殖周期驱动</span>：09合约交割期（9月）对应国内养殖旺季，饲料需求环比增长8%-12%。M2109合约价差1174元（最高4037元），反映2021年生猪存栏恢复带动的需求反弹。
+                                </p>
+                                <p className="mt-2">
+                                  <span className="font-medium">替代品联动</span>：菜粕与豆粕价差收窄至100元/吨（历史均值600元），若价差修复可能触发豆粕替代需求，支撑09合约底部
+                                </p>
+                              </div>
+                            </>
+                          )}
                         </div>
                       </div>
                     </>
@@ -1606,7 +1661,7 @@ const ProAnalysis: React.FC = () => {
                             ¥{priceRangeData?.current_price.toFixed(2)}
                           </div>
                         </div>
-                        <div className="bg-white rounded-lg shadow p-6">
+                        {/* <div className="bg-white rounded-lg shadow p-6">
                           <div className="text-sm text-gray-500 mb-1">反弹成功率</div>
                           <div className="text-2xl font-bold text-gray-900">
                             {priceRangeData?.bounce_success_rate.toFixed(2)}%
@@ -1617,11 +1672,128 @@ const ProAnalysis: React.FC = () => {
                               style={{ width: `${priceRangeData?.bounce_success_rate}%` }}
                             />
                           </div>
-                        </div>
+                        </div> */}
                         <div className="bg-white rounded-lg shadow p-6">
                           <div className="text-sm text-gray-500 mb-1">平均反弹幅度</div>
                           <div className="text-2xl font-bold text-gray-900">
                             {priceRangeData?.avg_bounce_amplitude.toFixed(2)}%
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="mb-8 bg-white rounded-lg shadow">
+                        <div className="p-6">
+                          <h3 className="text-lg font-semibold text-gray-900 mb-4">合约价格统计</h3>
+                          <div className="overflow-x-auto">
+                            <table className="min-w-full divide-y divide-gray-200">
+                              <thead className="bg-gray-50">
+                                <tr>
+                                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">合约</th>
+                                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">最低价</th>
+                                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">最高价</th>
+                                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">价差</th>
+                                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">合约开始价格</th>
+                                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">合约结束价格</th>
+                                </tr>
+                              </thead>
+                              <tbody className="bg-white divide-y divide-gray-200">
+                                {priceRangeData?.contract_stats.map((stat, index) => (
+                                  <tr key={stat.contract} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{stat.contract}</td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">¥{stat.lowest_price.toFixed(2)}</td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">¥{stat.highest_price.toFixed(2)}</td>
+                                    <td className={`px-6 py-4 whitespace-nowrap text-sm ${
+                                      stat.price_range >= 1500 ? 'text-red-800 font-bold' :
+                                      stat.price_range >= 1200 ? 'text-red-600' :
+                                      stat.price_range >= 1000 ? 'text-red-400' :
+                                      stat.price_range <= 300 ? 'text-blue-800 font-bold' :
+                                      stat.price_range <= 400 ? 'text-blue-600' :
+                                      stat.price_range <= 500 ? 'text-blue-400' :
+                                      'text-gray-500'
+                                    }`}>¥{stat.price_range.toFixed(2)}</td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">¥{stat.start_price.toFixed(2)}</td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">¥{stat.end_price.toFixed(2)}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                          
+                          <div className="mt-8 prose max-w-none">
+                            <div className="space-y-6">
+                              {selectedContract === 'M01' ? (
+                                <>
+                                  <div>
+                                    <h4 className="text-lg font-semibold text-gray-900">极端波动合约分析</h4>
+                                    <p className="mt-2">
+                                      <span className="font-medium">M2301合约</span>（2023年1月）价差高达1724元，创历史最大波动幅度。这与2023年全球大豆供应链扰动、厄尔尼诺天气炒作及外资资本操作密切相关。例如，2023年6-8月外资推动豆粕期货从3339元暴涨至5000元，引发贸易商踩踏式抛售，导致基差从800点暴跌至负值。
+                                    </p>
+                                    <p className="mt-2">
+                                      <span className="font-medium">M1301合约</span>（2013年1月）价差1445元，对应2012年美国干旱引发的全球大豆供应危机，推动豆粕价格突破4200元/吨的历史高位。
+                                    </p>
+                                  </div>
+                                  
+                                  <div>
+                                    <h4 className="text-lg font-semibold text-gray-900">周期性波动验证</h4>
+                                    <p className="mt-2">
+                                      从合约M1201（2012年）到M2501（2025年），豆粕价格呈现明显的4年大周期规律：
+                                    </p>
+                                    <div className="mt-2 space-y-2">
+                                      <p>
+                                        <span className="font-medium">高点年份</span>：2012年（3565元）、2016年（2926元）、2022年（4408元）、2026年（预测）
+                                      </p>
+                                      <p>
+                                        <span className="font-medium">低点年份</span>：2015年（2265元）、2020年（3140元）、2024年（2609元）
+                                      </p>
+                                    </div>
+                                  </div>
+                                </>
+                              ) : selectedContract === 'M05' ? (
+                                <>
+                                  <div>
+                                    <h4 className="text-lg font-semibold text-gray-900">价格波动与周期规律</h4>
+                                    <p className="mt-2">
+                                      <span className="font-medium">极端波动案例</span>：M2205合约价差达1605元（最高4495元/最低2890元），对应2022年南美干旱引发的全球大豆供应危机。当前M2505合约价差736元（最高3285元/最低2549元），波动幅度较前两年收窄，反映市场对南美丰产预期的压制作用。
+                                    </p>
+                                    <p className="mt-2">
+                                      <span className="font-medium">周期性低点验证</span>：05合约历史最低价多集中于2500-2600元区间（如M1605最低2246元、M2005最低2515元），与豆粕长期成本支撑位（3150-3250元压榨盈亏线）存在约20%的安全边际。
+                                    </p>
+                                  </div>
+                                  
+                                  <div>
+                                    <h4 className="text-lg font-semibold text-gray-900">交割月特性</h4>
+                                    <p className="mt-2">
+                                      <span className="font-medium">供应压力集中</span>：05合约交割期（5月）通常对应南美大豆集中到港（如2025年4-6月预计到港2400万吨），导致M2505结束价（2857元）较开始价（3285元）下跌13%。
+                                    </p>
+                                    <p className="mt-2">
+                                      <span className="font-medium">基差收敛逻辑</span>：近月合约易受现货抛压影响，例如2025年3月广东现货跌至3400元/吨，而M2505同期在2900元附近震荡，基差率从15%缩窄至6.95%
+                                    </p>
+                                  </div>
+                                </>
+                              ) : (
+                                <>
+                                  <div>
+                                    <h4 className="text-lg font-semibold text-gray-900">政策敏感性与天气溢价</h4>
+                                    <p className="mt-2">
+                                      <span className="font-medium">中美博弈窗口</span>：09合约覆盖北美大豆种植关键期（6-8月），价格易受美豆面积报告（3月底）及关税政策扰动。例如M2209合约价差2057元（最高5030元），对应2022年中美贸易摩擦升级引发的进口成本跳涨。
+                                    </p>
+                                    <p className="mt-2">
+                                      <span className="font-medium">天气炒作空间</span>：历史数据显示09合约最大价差达2057元（M2209），当前M2509价差仅451元（最高3168元/最低2717元），若美豆种植遭遇干旱，潜在上涨空间超过500元。
+                                    </p>
+                                  </div>
+                                  
+                                  <div>
+                                    <h4 className="text-lg font-semibold text-gray-900">需求旺季支撑</h4>
+                                    <p className="mt-2">
+                                      <span className="font-medium">养殖周期驱动</span>：09合约交割期（9月）对应国内养殖旺季，饲料需求环比增长8%-12%。M2109合约价差1174元（最高4037元），反映2021年生猪存栏恢复带动的需求反弹。
+                                    </p>
+                                    <p className="mt-2">
+                                      <span className="font-medium">替代品联动</span>：菜粕与豆粕价差收窄至100元/吨（历史均值600元），若价差修复可能触发豆粕替代需求，支撑09合约底部
+                                    </p>
+                                  </div>
+                                </>
+                              )}
+                            </div>
                           </div>
                         </div>
                       </div>

@@ -138,6 +138,14 @@ class HistoricalBottom(BaseModel):
     contract: str
     kline_data: Optional[List[KlineData]]
 
+class ContractStats(BaseModel):
+    contract: str
+    lowest_price: float
+    highest_price: float
+    price_range: float
+    start_price: float
+    end_price: float
+
 class PriceRangeAnalysis(BaseModel):
     bottom_price: float
     current_price: float
@@ -146,4 +154,5 @@ class PriceRangeAnalysis(BaseModel):
     bounce_success_rate: float
     avg_bounce_amplitude: float
     avg_bottom_duration: float
-    historical_bottoms: List[HistoricalBottom] 
+    historical_bottoms: List[HistoricalBottom]
+    contract_stats: List[ContractStats]  # 添加合约统计信息字段 

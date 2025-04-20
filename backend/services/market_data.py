@@ -1765,6 +1765,35 @@ class MarketDataService:
             latest_contract_data = valid_price_df.iloc[-1]
             current_price = float(latest_contract_data['close'])
             
+            # 计算每个合约的价格统计
+            contract_stats = []
+            for contract_code, contract_df in contract_groups:
+                # 确保数据按日期排序
+                contract_df = contract_df.sort_values('trade_date').reset_index(drop=True)
+                
+                # 只处理有足够数据的合约（至少有60个交易日的数据）
+                if len(contract_df) < 60:
+                    continue
+                
+                # 过滤掉价格为0或异常的数据
+                valid_df = contract_df[contract_df['low'] > 0]
+                if len(valid_df) < 60:  # 确保过滤后仍有足够数据
+                    continue
+
+                # 计算统计数据
+                contract_stat = {
+                    'contract': str(contract_code.split('.')[0]),  # 去掉.DCE后缀
+                    'lowest_price': float(valid_df['low'].min()),
+                    'highest_price': float(valid_df['high'].max()),
+                    'price_range': float(valid_df['high'].max() - valid_df['low'].min()),
+                    'start_price': float(valid_df['open'].iloc[0]),
+                    'end_price': float(valid_df['close'].iloc[-1])
+                }
+                contract_stats.append(contract_stat)
+
+            # 按合约代码排序
+            contract_stats.sort(key=lambda x: x['contract'])
+
             return PriceRangeAnalysis(
                 bottom_price=float(bottom_price),
                 current_price=float(current_price),
@@ -1773,7 +1802,8 @@ class MarketDataService:
                 bounce_success_rate=float(bounce_success_rate),
                 avg_bounce_amplitude=float(avg_bounce_amplitude),
                 avg_bottom_duration=int(avg_bottom_duration),
-                historical_bottoms=historical_bottoms
+                historical_bottoms=historical_bottoms,
+                contract_stats=contract_stats  # 添加合约统计信息
             )
         except Exception as e:
             logger.error(f"计算价格区间分析失败: {str(e)}")
