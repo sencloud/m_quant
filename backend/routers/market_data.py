@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException, Depends, Query
 from typing import List, Optional
 from services.market_data import MarketDataService
 from services.opt_service import OptService
-from models.market_data import FuturesData, ETFData, OptionsData, InventoryData, TechnicalIndicators, OptionsHedgeData, OptionBasic, OptionDaily
+from models.market_data import FuturesData, ETFData, OptionsData, InventoryData, TechnicalIndicators, OptionsHedgeData, OptionBasic, OptionDaily, CostComparisonData, PriceRangeAnalysis
 from utils.logger import logger
 from datetime import datetime, timedelta
 
@@ -274,4 +274,33 @@ async def get_realtime_arbitrage_data(
         return data
     except Exception as e:
         logger.error(f"获取实时套利数据失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/futures/cost-comparison", response_model=List[CostComparisonData])
+async def get_cost_comparison_data(
+    service: MarketDataService = Depends(get_market_data_service)
+):
+    """获取豆粕成本和主力合约价格比较数据"""
+    logger.info("收到成本比较数据请求")
+    try:
+        data = service.get_cost_comparison_data()
+        logger.info(f"成功返回成本比较数据，共{len(data)}条记录")
+        return data
+    except Exception as e:
+        logger.error(f"成本比较数据请求失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/futures/price-range-analysis", response_model=PriceRangeAnalysis)
+async def get_price_range_analysis(
+    contract: str = "M01",
+    service: MarketDataService = Depends(get_market_data_service)
+):
+    """获取价格区间分析数据"""
+    logger.info(f"收到价格区间分析请求 - 合约: {contract}")
+    try:
+        data = service.get_price_range_analysis(contract)
+        logger.info(f"成功返回价格区间分析数据")
+        return data
+    except Exception as e:
+        logger.error(f"价格区间分析数据请求失败: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e)) 

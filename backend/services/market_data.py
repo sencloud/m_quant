@@ -5,7 +5,7 @@ import akshare as ak
 from datetime import datetime, timedelta
 from typing import List, Optional, Dict
 from config import settings
-from models.market_data import FuturesData, ETFData, OptionsData
+from models.market_data import FuturesData, ETFData, OptionsData, PriceRangeAnalysis
 from utils.logger import logger
 import time
 import threading
@@ -1170,7 +1170,7 @@ class MarketDataService:
                     "heatmap_data": heatmap_data,
                     "monthly_avg_stats": monthly_avg_stats
                 }
-                logger.info(f"存储{contract_key}合约结果: {result[contract_key]}")
+                # logger.info(f"存储{contract_key}合约结果: {result[contract_key]}")
             
             # 添加关键事件标注
             key_events = [
@@ -1309,7 +1309,7 @@ class MarketDataService:
             # 添加关键事件到结果中
             result['key_events'] = key_events
             
-            logger.info(f"最终返回结果: {result}")
+            # logger.info(f"最终返回结果: {result}")
             return result
             
         except Exception as e:
@@ -1518,4 +1518,214 @@ class MarketDataService:
             }
         except Exception as e:
             logger.error(f"获取实时套利数据失败: {str(e)}")
-            raise 
+            raise
+
+    def get_cost_comparison_data(self) -> List[dict]:
+        """获取豆粕成本和主力合约价格比较数据"""
+        try:
+            # 获取豆粕成本数据
+            cost_df = ak.futures_hog_cost(symbol="豆粕")
+            if cost_df is None or cost_df.empty:
+                logger.warning("未找到豆粕成本数据")
+                return []
+            
+            # 打印列名以便调试
+            logger.info(f"成本数据数量: {len(cost_df)}")
+            
+            # 重命名列以匹配我们的模型
+            column_mapping = {
+                '日期': 'date',
+                '价格': 'value'  # 假设价格列是成本价
+            }
+            cost_df = cost_df.rename(columns=column_mapping)
+            
+            # 获取主力合约数据
+            futures_data = self.get_futures_data(symbol="M")
+            
+            if not futures_data:
+                logger.warning("未找到豆粕期货数据")
+                return []
+            
+            # 将期货数据转换为DataFrame
+            futures_rows = []
+            for contract_data in futures_data:
+                # 遍历每个合约的历史价格数据
+                if hasattr(contract_data, 'historicalPrices') and contract_data.historicalPrices:
+                    for price_data in contract_data.historicalPrices:
+                        futures_rows.append({
+                            'date': price_data['date'],
+                            'futures_price': price_data['close']
+                        })
+            
+            futures_df = pd.DataFrame(futures_rows)
+            logger.info(f"期货数据数量: {len(futures_df)}")
+            
+            # 统一日期格式：先转换成datetime，再转换成相同的字符串格式
+            # 成本数据：yyyy-MM-dd -> datetime -> yyyyMMdd
+            cost_df['date'] = pd.to_datetime(cost_df['date']).dt.strftime('%Y%m%d')
+            
+            # 期货数据已经是yyyyMMdd格式，但为了保证一致性，也做同样的处理
+            futures_df['date'] = pd.to_datetime(futures_df['date'], format='%Y%m%d').dt.strftime('%Y%m%d')
+            
+            # 打印合并前的数据行数
+            logger.info(f"合并前 - 成本数据行数: {len(cost_df)}, 期货数据行数: {len(futures_df)}")
+            logger.info(f"成本数据日期范围: {cost_df['date'].min()} - {cost_df['date'].max()}")
+            logger.info(f"期货数据日期范围: {futures_df['date'].min()} - {futures_df['date'].max()}")
+            
+            # 合并数据
+            merged_df = pd.merge(cost_df, futures_df, on='date', how='inner')
+            
+            # 打印合并后的数据行数和示例
+            logger.info(f"合并后数据行数: {len(merged_df)}")
+            logger.info(f"合并后数据示例:\n{merged_df.head()}")
+            
+            # 计算价差和价格比
+            merged_df['price_diff'] = merged_df['value'] - merged_df['futures_price']
+            merged_df['price_ratio'] = merged_df['value'] / merged_df['futures_price']
+            
+            # 按日期排序
+            merged_df = merged_df.sort_values('date')
+            
+            # 转换为列表
+            result = []
+            for _, row in merged_df.iterrows():
+                result.append({
+                    'date': row['date'],
+                    'cost': float(row['value']),
+                    'futures_price': float(row['futures_price']),
+                    'price_diff': float(row['price_diff']),
+                    'price_ratio': float(row['price_ratio'])
+                })
+            
+            logger.info(f"最终结果数量: {len(result)}")
+            return result
+        except Exception as e:
+            logger.error(f"获取成本比较数据失败: {str(e)}")
+            # 打印完整的错误堆栈以便调试
+            import traceback
+            logger.error(f"错误堆栈: {traceback.format_exc()}")
+            return [] 
+
+    def get_price_range_analysis(self, contract: str) -> PriceRangeAnalysis:
+        try:
+            # 获取当前日期
+            current_date = datetime.now()
+            current_month = current_date.month
+            current_year = current_date.year
+            
+            # 根据合约类型生成实际合约代码列表
+            contract_type = contract[-2:]  # 获取月份部分 (01/05/09)
+            contract_codes = []
+            
+            # 根据当前月份确定是否需要使用下一年的合约
+            next_year = False
+            if (contract_type == "01" and current_month > 1) or \
+               (contract_type == "05" and current_month > 5) or \
+               (contract_type == "09" and current_month > 9):
+                next_year = True
+            
+            # 从当前年份往前推15年
+            start_year = current_year + (1 if next_year else 0)
+            for year in range(start_year, start_year - 15, -1):
+                contract_code = f"M{str(year)[-2:]}{contract_type}.DCE"  # 添加.DCE后缀
+                contract_codes.append(contract_code)
+            
+            # 获取所有合约的数据
+            all_data = []
+            for code in contract_codes:
+                try:
+                    data = self._get_futures_data(symbol=code)
+                    if data:
+                        all_data.extend(data)
+                except Exception as e:
+                    logger.error(f"获取{code}数据失败: {str(e)}")
+                    continue
+            
+            if not all_data:
+                raise ValueError("未获取到任何期货数据")
+            
+            # 转换为DataFrame
+            df = pd.DataFrame([d.dict() for d in all_data])
+            df['trade_date'] = pd.to_datetime(df['trade_date'])
+            df = df.sort_values('trade_date')
+            
+            # 计算历史底部区域
+            window_size = 20  # 用于判断局部最低点的窗口大小
+            historical_bottoms = []
+            
+            # 按合约分组处理数据
+            contract_groups = df.groupby('ts_code')
+            
+            for contract_code, contract_df in contract_groups:
+                # 确保数据按日期排序
+                contract_df = contract_df.sort_values('trade_date').reset_index(drop=True)
+                
+                # 只处理有足够数据的合约
+                if len(contract_df) < window_size * 2:
+                    continue
+                
+                for i in range(window_size, len(contract_df) - window_size):
+                    # 判断是否是局部最低点
+                    current_price = contract_df['low'].iloc[i]
+                    window_before = contract_df['low'].iloc[i-window_size:i]
+                    window_after = contract_df['low'].iloc[i+1:i+window_size+1]
+                    
+                    if current_price <= window_before.min() and current_price <= window_after.min():
+                        # 找到底部区域的开始和结束日期
+                        start_idx = i
+                        while start_idx > 0 and contract_df['low'].iloc[start_idx-1] >= current_price:
+                            start_idx -= 1
+                            
+                        end_idx = i
+                        while end_idx < len(contract_df)-1 and contract_df['low'].iloc[end_idx+1] >= current_price:
+                            end_idx += 1
+                        
+                        # 计算反弹幅度 (使用之后20个交易日的最高价)
+                        bounce_amplitude = 0
+                        if end_idx + 20 < len(contract_df):
+                            max_price_after = contract_df['high'].iloc[end_idx+1:end_idx+21].max()
+                            if current_price > 0:  # 添加除零检查
+                                bounce_amplitude = (max_price_after - current_price) / current_price * 100
+                        
+                        historical_bottoms.append({
+                            "start_date": contract_df['trade_date'].iloc[start_idx].strftime("%Y%m%d"),
+                            "end_date": contract_df['trade_date'].iloc[end_idx].strftime("%Y%m%d"),
+                            "duration": end_idx - start_idx + 1,
+                            "bounce_amplitude": float(bounce_amplitude),  # 确保是Python原生float
+                            "lowest_price": float(current_price),  # 确保是Python原生float
+                            "contract": contract_code
+                        })
+            
+            if not historical_bottoms:
+                raise ValueError("未找到历史底部区域")
+            
+            # 计算统计数据
+            bottom_prices = [b["lowest_price"] for b in historical_bottoms]
+            bottom_price = min(bottom_prices)
+            bottom_range_end = bottom_price * 1.2
+            
+            # 计算反弹成功率
+            successful_bounces = sum(1 for b in historical_bottoms if b["bounce_amplitude"] > 5)  # 反弹超过5%视为成功
+            bounce_success_rate = (successful_bounces / len(historical_bottoms)) * 100 if historical_bottoms else 0
+            
+            # 计算平均反弹幅度和平均持续时间
+            avg_bounce_amplitude = sum(b["bounce_amplitude"] for b in historical_bottoms) / len(historical_bottoms) if historical_bottoms else 0
+            avg_bottom_duration = sum(b["duration"] for b in historical_bottoms) / len(historical_bottoms) if historical_bottoms else 0
+            
+            # 获取当前价格 (使用最新合约的收盘价)
+            latest_contract_data = df.sort_values('trade_date').iloc[-1]
+            current_price = float(latest_contract_data['close'])
+            
+            return PriceRangeAnalysis(
+                bottom_price=float(bottom_price),  # 确保是Python原生float
+                current_price=float(current_price),  # 确保是Python原生float
+                bottom_range_start=float(bottom_price),  # 确保是Python原生float
+                bottom_range_end=float(bottom_range_end),  # 确保是Python原生float
+                bounce_success_rate=float(bounce_success_rate),  # 确保是Python原生float
+                avg_bounce_amplitude=float(avg_bounce_amplitude),  # 确保是Python原生float
+                avg_bottom_duration=float(avg_bottom_duration),  # 确保是Python原生float
+                historical_bottoms=historical_bottoms
+            )
+        except Exception as e:
+            logger.error(f"计算价格区间分析失败: {str(e)}")
+            raise

@@ -112,4 +112,21 @@ class OptionDaily(BaseModel):
     settle: Optional[float] = None
     vol: Optional[float] = None
     amount: Optional[float] = None
-    oi: Optional[float] = None 
+    oi: Optional[float] = None
+
+class CostComparisonData(BaseModel):
+    date: str
+    cost: float  # 豆粕成本价
+    futures_price: float  # 主力合约价格
+    price_diff: float  # 价差
+    price_ratio: float  # 价格比
+
+class PriceRangeAnalysis(BaseModel):
+    bottom_price: float
+    current_price: float
+    bottom_range_start: float
+    bottom_range_end: float
+    bounce_success_rate: float
+    avg_bounce_amplitude: float
+    avg_bottom_duration: float  # 修改为float类型
+    historical_bottoms: List[dict]  # 历史底部区域记录 

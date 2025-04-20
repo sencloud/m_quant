@@ -3,10 +3,10 @@ import { useQuery } from '@tanstack/react-query';
 import axios from 'axios';
 import { API_ENDPOINTS } from '../config/api';
 import Layout from '../components/layout/Layout';
-import { Card, Skeleton, Tabs, Tooltip, Select, List, Tag } from 'antd';
+import { Card, Skeleton, Tabs, Tooltip, Select, List, Tag, Statistic, Row, Col, Progress } from 'antd';
 import ReactECharts from 'echarts-for-react';
 import * as echarts from 'echarts';
-import { HeatMapOutlined, LineChartOutlined, HistoryOutlined } from '@ant-design/icons';
+import { HeatMapOutlined, LineChartOutlined, HistoryOutlined, AreaChartOutlined } from '@ant-design/icons';
 import MDEditor from '@uiw/react-md-editor';
 import { EChartsOption } from 'echarts';
 
@@ -37,6 +37,32 @@ interface MonthlyProbabilityData {
   key_events: KeyEvent[];
 }
 
+interface CostComparisonData {
+  date: string;
+  cost: number;
+  futures_price: number;
+  price_diff: number;
+  price_ratio: number;
+}
+
+interface PriceRangeData {
+  bottom_price: number;
+  current_price: number;
+  bottom_range_start: number;
+  bottom_range_end: number;
+  bounce_success_rate: number;
+  avg_bounce_amplitude: number;
+  avg_bottom_duration: number;
+  historical_bottoms: Array<{
+    start_date: string;
+    end_date: string;
+    duration: number;
+    bounce_amplitude: number;
+    lowest_price: number;
+    contract: string;
+  }>;
+}
+
 type ContractType = 'M01' | 'M05' | 'M09';
 
 const ProAnalysis: React.FC = () => {
@@ -52,6 +78,26 @@ const ProAnalysis: React.FC = () => {
     queryKey: ['monthlyProbability'],
     queryFn: async () => {
       const response = await axios.get(API_ENDPOINTS.market.monthlyProbability);
+      return response.data;
+    },
+    refetchOnWindowFocus: false
+  });
+
+  const { data: costComparisonData, isLoading: isLoadingCostComparison } = useQuery<CostComparisonData[]>({
+    queryKey: ['costComparison'],
+    queryFn: async () => {
+      const response = await axios.get(API_ENDPOINTS.market.futures + '/cost-comparison');
+      return response.data;
+    },
+    refetchOnWindowFocus: false
+  });
+
+  const { data: priceRangeData, isLoading: isLoadingPriceRange } = useQuery<PriceRangeData>({
+    queryKey: ['priceRange', selectedContract],
+    queryFn: async () => {
+      const response = await axios.get(API_ENDPOINTS.market.futures + '/price-range-analysis', {
+        params: { contract: selectedContract }
+      });
       return response.data;
     },
     refetchOnWindowFocus: false
@@ -195,10 +241,15 @@ const ProAnalysis: React.FC = () => {
         data: probs,
         type: 'line',
         smooth: true,
-        areaStyle: {},
+        showSymbol: false,
+        areaStyle: {
+          opacity: 0.3
+        },
+        lineStyle: {
+          width: 2
+        },
         label: {
-          show: true,
-          formatter: (params: any) => `${(params.value * 100).toFixed(1)}%`
+          show: false
         }
       }]
     };
@@ -802,6 +853,272 @@ const ProAnalysis: React.FC = () => {
     );
   };
 
+  // 成本价格比对图配置
+  const getCostComparisonOption = () => {
+    if (!costComparisonData) return {};
+    
+    const dates = costComparisonData.map(item => item.date);
+    const costs = costComparisonData.map(item => item.cost);
+    const futuresPrices = costComparisonData.map(item => item.futures_price);
+    const priceDiffs = costComparisonData.map(item => item.price_diff);
+    const priceRatios = costComparisonData.map(item => item.price_ratio);
+    
+    return {
+      title: {
+        text: '豆粕成本与期货价格比对',
+        left: 'center',
+        top: 0
+      },
+      tooltip: {
+        trigger: 'axis',
+        axisPointer: {
+          type: 'cross'
+        }
+      },
+      legend: {
+        data: ['成本价', '期货价', '价差', '价格比'],
+        top: 30
+      },
+      grid: [
+        {
+          left: '5%',
+          right: '5%',
+          top: '20%',
+          height: '35%'
+        },
+        {
+          left: '5%',
+          right: '5%',
+          top: '65%',
+          height: '25%'
+        }
+      ],
+      xAxis: [
+        {
+          type: 'category',
+          data: dates,
+          axisLabel: {
+            formatter: (value: string) => {
+              return `${value.slice(0, 4)}-${value.slice(4, 6)}-${value.slice(6, 8)}`;
+            }
+          },
+          gridIndex: 0
+        },
+        {
+          type: 'category',
+          data: dates,
+          axisLabel: {
+            formatter: (value: string) => {
+              return `${value.slice(0, 4)}-${value.slice(4, 6)}-${value.slice(6, 8)}`;
+            }
+          },
+          gridIndex: 1
+        }
+      ],
+      yAxis: [
+        {
+          type: 'value',
+          name: '价格',
+          gridIndex: 0
+        },
+        {
+          type: 'value',
+          name: '价差',
+          gridIndex: 1
+        },
+        {
+          type: 'value',
+          name: '价格比',
+          gridIndex: 1,
+          axisLabel: {
+            formatter: '{value}%'
+          }
+        }
+      ],
+      dataZoom: [
+        {
+          type: 'inside',
+          xAxisIndex: [0, 1],
+          start: 0,
+          end: 100
+        },
+        {
+          show: true,
+          xAxisIndex: [0, 1],
+          type: 'slider',
+          bottom: '5%',
+          start: 0,
+          end: 100
+        }
+      ],
+      series: [
+        {
+          name: '成本价',
+          type: 'line',
+          data: costs,
+          xAxisIndex: 0,
+          yAxisIndex: 0,
+          itemStyle: {
+            color: '#f5222d'
+          },
+          smooth: true,
+          showSymbol: false,
+          lineStyle: {
+            width: 2
+          }
+        },
+        {
+          name: '期货价',
+          type: 'line',
+          data: futuresPrices,
+          xAxisIndex: 0,
+          yAxisIndex: 0,
+          itemStyle: {
+            color: '#52c41a'
+          },
+          smooth: true,
+          showSymbol: false,
+          lineStyle: {
+            width: 2
+          }
+        },
+        {
+          name: '价差',
+          type: 'bar',
+          data: priceDiffs,
+          xAxisIndex: 1,
+          yAxisIndex: 1,
+          itemStyle: {
+            color: function(params: any) {
+              return params.data >= 0 ? '#f5222d' : '#52c41a';
+            }
+          }
+        },
+        {
+          name: '价格比',
+          type: 'line',
+          data: priceRatios.map(ratio => (ratio * 100).toFixed(2)),
+          xAxisIndex: 1,
+          yAxisIndex: 2,
+          itemStyle: {
+            color: '#1890ff'
+          },
+          smooth: true,
+          showSymbol: false,
+          lineStyle: {
+            width: 2
+          }
+        }
+      ]
+    };
+  };
+
+  // 价格区间分析图表配置
+  const getPriceRangeOption = () => {
+    if (!priceRangeData) return {};
+
+    const historicalBottoms = priceRangeData.historical_bottoms;
+    const dates = historicalBottoms.map(b => b.start_date);
+    const durations = historicalBottoms.map(b => b.duration);
+    const amplitudes = historicalBottoms.map(b => b.bounce_amplitude);
+    const prices = historicalBottoms.map(b => b.lowest_price);
+
+    return {
+      title: {
+        text: '历史底部区域分析',
+        left: 'center',
+        top: 0
+      },
+      tooltip: {
+        trigger: 'axis',
+        axisPointer: {
+          type: 'cross'
+        },
+        formatter: function(params: any) {
+          const idx = params[0].dataIndex;
+          const bottom = historicalBottoms[idx];
+          return `
+            <div style="font-weight: bold">${bottom.start_date} 至 ${bottom.end_date}</div>
+            <div>持续时间: ${bottom.duration}天</div>
+            <div>反弹幅度: ${bottom.bounce_amplitude.toFixed(2)}%</div>
+            <div>最低价: ${bottom.lowest_price}</div>
+          `;
+        }
+      },
+      legend: {
+        data: ['持续时间', '反弹幅度', '最低价'],
+        top: 30
+      },
+      grid: {
+        left: '3%',
+        right: '4%',
+        bottom: '3%',
+        containLabel: true,
+        top: 100
+      },
+      xAxis: {
+        type: 'category',
+        data: dates,
+        axisLabel: {
+          formatter: (value: string) => {
+            return value.slice(0, 4) + '\n' + value.slice(4, 6) + '-' + value.slice(6, 8);
+          },
+          interval: 0,
+          rotate: 45
+        }
+      },
+      yAxis: [
+        {
+          type: 'value',
+          name: '天数/幅度(%)',
+          position: 'left'
+        },
+        {
+          type: 'value',
+          name: '价格',
+          position: 'right'
+        }
+      ],
+      series: [
+        {
+          name: '持续时间',
+          type: 'bar',
+          data: durations,
+          itemStyle: {
+            color: '#91cc75'
+          }
+        },
+        {
+          name: '反弹幅度',
+          type: 'line',
+          data: amplitudes,
+          itemStyle: {
+            color: '#ee6666'
+          },
+          symbol: 'circle',
+          symbolSize: 8,
+          lineStyle: {
+            width: 2
+          }
+        },
+        {
+          name: '最低价',
+          type: 'line',
+          yAxisIndex: 1,
+          data: prices,
+          itemStyle: {
+            color: '#5470c6'
+          },
+          symbol: 'circle',
+          symbolSize: 8,
+          lineStyle: {
+            width: 2
+          }
+        }
+      ]
+    };
+  };
+
   return (
     <Layout>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
@@ -964,6 +1281,166 @@ const ProAnalysis: React.FC = () => {
                         />
                       )}
                     </div>
+                  )}
+                </Card>
+              )
+            },
+            {
+              key: '3',
+              label: (
+                <span>
+                  <LineChartOutlined />
+                  &nbsp; 成本期价比
+                </span>
+              ),
+              children: (
+                <Card>
+                  {isLoadingCostComparison ? (
+                    <Skeleton active />
+                  ) : (
+                    <>
+                      <div className="mb-4">
+                        <h2 className="text-xl font-bold text-gray-800">豆粕成本与期货价格比对分析</h2>
+                        <p className="text-sm text-gray-500 mb-2">
+                          注：价差 = 成本价 - 期货价，价格比 = 成本价/期货价
+                        </p>
+                        <ReactECharts 
+                          option={getCostComparisonOption()} 
+                          style={{ height: '600px' }}
+                          notMerge={true}
+                          lazyUpdate={true}
+                        />
+                      </div>
+                      <div className="mt-8 prose max-w-none">
+                        <div className="markdown-content" data-color-mode="light" style={{
+                          backgroundColor: 'white',
+                          padding: '20px'
+                        }}>
+                          <MDEditor.Markdown 
+                            source={`
+### 豆粕成本与期货价格关系分析
+
+1. **价差分析**
+   - 正价差（成本价高于期货价）表明现货市场供应偏紧或需求旺盛
+   - 负价差（成本价低于期货价）表明期货市场看涨预期较强
+
+2. **价格比分析**
+   - 价格比>1表示成本价高于期货价，可能存在套利机会
+   - 价格比<1表示期货价高于成本价，需警惕价格回归风险
+
+3. **市场启示**
+   - 当价差和价格比处于历史极值时，往往预示着市场拐点
+   - 可结合基本面和技术面指标，综合判断市场走势
+                          `}
+                            style={{
+                              fontSize: '14px',
+                              lineHeight: '1.6',
+                              color: '#333'
+                            }}
+                          />
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </Card>
+              )
+            },
+            {
+              key: '4',
+              label: (
+                <span>
+                  <AreaChartOutlined />
+                  &nbsp; 价格区间
+                </span>
+              ),
+              children: (
+                <Card>
+                  {isLoadingPriceRange ? (
+                    <Skeleton active />
+                  ) : (
+                    <>
+                      <div className="grid grid-cols-4 gap-4 mb-8">
+                        <div className="bg-white rounded-lg shadow p-6">
+                          <div className="text-sm text-gray-500 mb-1">历史底部价格</div>
+                          <div className="text-2xl font-bold text-gray-900">
+                            ¥{priceRangeData?.bottom_price.toFixed(2)}
+                          </div>
+                        </div>
+                        <div className="bg-white rounded-lg shadow p-6">
+                          <div className="text-sm text-gray-500 mb-1">当前价格</div>
+                          <div className={`text-2xl font-bold ${
+                            priceRangeData && priceRangeData.current_price <= priceRangeData.bottom_range_end 
+                            ? 'text-green-600' 
+                            : 'text-red-600'
+                          }`}>
+                            ¥{priceRangeData?.current_price.toFixed(2)}
+                          </div>
+                        </div>
+                        <div className="bg-white rounded-lg shadow p-6">
+                          <div className="text-sm text-gray-500 mb-1">反弹成功率</div>
+                          <div className="text-2xl font-bold text-gray-900">
+                            {priceRangeData?.bounce_success_rate.toFixed(2)}%
+                          </div>
+                          <div className="mt-2 h-2 bg-gray-200 rounded-full">
+                            <div 
+                              className="h-2 bg-gradient-to-r from-blue-500 to-green-500 rounded-full" 
+                              style={{ width: `${priceRangeData?.bounce_success_rate}%` }}
+                            />
+                          </div>
+                        </div>
+                        <div className="bg-white rounded-lg shadow p-6">
+                          <div className="text-sm text-gray-500 mb-1">平均反弹幅度</div>
+                          <div className="text-2xl font-bold text-gray-900">
+                            {priceRangeData?.avg_bounce_amplitude.toFixed(2)}%
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="mb-8 bg-white rounded-lg shadow">
+                        <div className="p-6">
+                          <h3 className="text-lg font-semibold text-gray-900 mb-4">底部区间分析</h3>
+                          <div className="text-sm text-gray-500 mb-4">
+                            底部区间定义：历史最低价（¥{priceRangeData?.bottom_price.toFixed(2)}）至其1.2倍（¥{priceRangeData?.bottom_range_end.toFixed(2)}）
+                          </div>
+                          <div className="text-sm text-gray-500 mb-4">
+                            平均停留时间：{priceRangeData?.avg_bottom_duration}天
+                          </div>
+                          <ReactECharts
+                            option={getPriceRangeOption()}
+                            style={{ height: '400px' }}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="bg-white rounded-lg shadow">
+                        <div className="p-6">
+                          <h3 className="text-lg font-semibold text-gray-900 mb-4">历史底部记录</h3>
+                          <div className="space-y-4">
+                            {priceRangeData?.historical_bottoms.map((item, index) => (
+                              <div key={index} className="border-b border-gray-200 pb-4 last:border-b-0">
+                                <div className="font-medium text-gray-900">
+                                  {item.start_date.slice(0, 4)}-{item.start_date.slice(4, 6)}-{item.start_date.slice(6, 8)} 至 {item.end_date.slice(0, 4)}-{item.end_date.slice(4, 6)}-{item.end_date.slice(6, 8)}
+                                </div>
+                                <div className="mt-2 flex gap-3">
+                                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                                    {item.contract}
+                                  </span>
+                                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                    持续{item.duration}天
+                                  </span>
+                                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                    最低价: ¥{item.lowest_price.toFixed(2)}
+                                  </span>
+                                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                                    反弹幅度: {item.bounce_amplitude.toFixed(2)}%
+                                  </span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    </>
                   )}
                 </Card>
               )
