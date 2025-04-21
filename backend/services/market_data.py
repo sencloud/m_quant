@@ -451,6 +451,75 @@ class MarketDataService:
         except Exception as e:
             self.logger.error(f"获取ETF数据失败: {str(e)}")
             raise
+    
+    def get_etf_data_weekly(
+        self,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
+        symbol: str = "159985.SZ"
+    ) -> List[ETFData]:
+        """获取ETF周线数据并计算技术指标"""
+        logger.info(f"获取ETF周线数据 - 代码: {symbol}, 开始日期: {start_date}, 结束日期: {end_date}")
+        try:
+            if not start_date:
+                start_date = (datetime.now() - timedelta(days=30)).strftime('%Y%m%d')
+            if not end_date:
+                end_date = datetime.now().strftime('%Y%m%d')
+            
+            # 获取ETF周线数据
+            # 从data/159985.SZ_fund_weekly_20190101_20251231.csv中获取数据
+            df = pd.read_csv('data/159985.SZ_fund_weekly_20190101_20251231.csv')
+            # 重命名列以匹配我们的模型
+            df = df.rename(columns={
+                'date': 'trade_date',
+                'open': 'open',
+                'high': 'high',
+                'low': 'low',
+                'close': 'close',
+                'vol': 'vol',
+                'amount': 'amount'
+            })
+            
+            # 按时间正序排序
+            df = df.sort_values('trade_date')
+            
+            # 计算技术指标
+            df['ma5'] = self.calculate_ma(df, 8)
+            df['ma8'] = self.calculate_ma(df, 21)
+            df['atr'] = self.calculate_atr(df)
+
+            # 生成交易信号
+            df = self.generate_signals(df)
+            
+            # 转换为模型格式
+            return [
+                ETFData(
+                    ts_code=symbol,
+                    trade_date=datetime.strptime(str(row['trade_date']), '%Y%m%d').strftime('%Y-%m-%d'),
+                    open=float(row['open']) if pd.notnull(row['open']) and not np.isinf(row['open']) else 0.0,
+                    high=float(row['high']) if pd.notnull(row['high']) and not np.isinf(row['high']) else 0.0,
+                    low=float(row['low']) if pd.notnull(row['low']) and not np.isinf(row['low']) else 0.0,
+                    close=float(row['close']) if pd.notnull(row['close']) and not np.isinf(row['close']) else 0.0,
+                    vol=float(row['vol']) if pd.notnull(row['vol']) and not np.isinf(row['vol']) else 0.0,
+                    amount=float(row['amount']) if pd.notnull(row['amount']) and not np.isinf(row['amount']) else 0.0,
+                    ma5=float(row['ma5']) if pd.notnull(row['ma5']) and not np.isinf(row['ma5']) else 0.0,
+                    ma8=float(row['ma8']) if pd.notnull(row['ma8']) and not np.isinf(row['ma8']) else 0.0,
+                    atr=float(row['atr']) if pd.notnull(row['atr']) and not np.isinf(row['atr']) else 0.0,
+                    signal=row['signal'],
+                    stop_loss=float(row['stop_loss']) if pd.notnull(row['stop_loss']) and not np.isinf(row['stop_loss']) else None,
+                    take_profit=float(row['take_profit']) if pd.notnull(row['take_profit']) and not np.isinf(row['take_profit']) else None,
+                    last_signal=row['last_signal'],
+                    last_signal_date=str(row['last_signal_date']) if pd.notnull(row['last_signal_date']) else None,
+                    last_signal_price=float(row['last_signal_price']) if pd.notnull(row['last_signal_price']) and not np.isinf(row['last_signal_price']) else None,
+                    last_stop_loss=float(row['last_stop_loss']) if pd.notnull(row['last_stop_loss']) and not np.isinf(row['last_stop_loss']) else None,
+                    last_take_profit=float(row['last_take_profit']) if pd.notnull(row['last_take_profit']) and not np.isinf(row['last_take_profit']) else None
+                )
+                for _, row in df.iterrows()
+            ]
+            
+        except Exception as e:
+            self.logger.error(f"获取ETF数据失败: {str(e)}")
+            raise
 
     def get_options_data(
         self,

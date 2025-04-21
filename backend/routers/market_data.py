@@ -52,7 +52,7 @@ async def get_etf_data(
     """获取豆粕ETF数据"""
     logger.info(f"收到ETF数据请求 - 代码: {symbol}, 开始日期: {start_date}, 结束日期: {end_date}")
     try:
-        data = service.get_etf_data(start_date, end_date, symbol)
+        data = service.get_etf_data_weekly(start_date, end_date, symbol)
         logger.info(f"成功返回ETF数据，共{len(data)}条记录")
         return data
     except Exception as e:

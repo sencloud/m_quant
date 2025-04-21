@@ -6,7 +6,7 @@ import os
 # 添加项目根目录到Python路径
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-from routers import market_data, trading, fundamental, core_factor, arbitrage, trend_follow, obv_adx_ema, news, ai, signals, account
+from routers import market_data, trading, fundamental, core_factor, arbitrage, trend_follow, dual_ma, obv_adx_ema, news, ai, signals, account
 from config import settings
 from utils.logger import logger
 
@@ -67,6 +67,13 @@ app.include_router(
     tags=["trend_follow"]
 )
 logger.info("趋势跟随策略路由注册完成")
+
+app.include_router(
+    dual_ma.router,
+    prefix=f"{settings.API_V1_STR}/dual_ma",
+    tags=["dual_ma"]
+)
+logger.info("双均线策略路由注册完成")
 
 app.include_router(
     obv_adx_ema.router,
