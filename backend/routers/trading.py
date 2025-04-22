@@ -36,7 +36,7 @@ async def stream_response(response, request: Request, date: str):
                 
             try:
                 if hasattr(chunk, "references"):
-                    print(chunk.references)
+                    pass
                 if not chunk.choices:
                     continue
                 if chunk.choices[0].delta.content:
@@ -91,29 +91,49 @@ async def get_options_strategies(
 
         # 如果数据库中没有，则调用Deepseek API
         logger.info("数据库中没有找到策略分析，开始调用Deepseek API")
-        
-        prompt = f"""请基于{date}的豆粕及豆粕强相关联的品种市场数据，对豆粕ETF、豆粕期货和豆粕期权市场进行全面分析，必须从数据出发，不能做任何假设，只能从互联网上获取最新数据，同时结合你已有的金融知识，对下一个交易日给出交易策略建议，包含以下维度：
 
-1、盘中分析：
-- 豆粕ETF、豆粕期货和豆粕期权交易时段盘中情况的技术分析
-2、交易策略建议：
-- 给出下一个交易日各品种独立交易策略建议
-3、组合策略建议：
-- 给出下一个交易日组合策略建议
-4、风险管理：
-- 给出下一个交易日风险管理建议
-5、关联品种分析：
-- 给出当日及下一个交易日关联品种分析
+        # 获取交易数据
+        trading_data = trading_service.get_trading_data()
+        if not trading_data or 'raw_data' not in trading_data:
+            raise HTTPException(status_code=500, detail="获取交易数据失败")
 
-请提供详细的数据支持和具体的价格区间。"""
-        
+        raw_data = trading_data['raw_data']
+        prompt = f"""我需要生成一份提示词，其核心目标是：基于多维度数据生成豆粕主力合约（{raw_data['main_contract']}）下一个交易日的交易操作策略。 目前我已经有如下框架，请帮我把【】内的数据说明用最新的互联网资讯补充完成（最好是今天的），并将补完后的这份提示词完整返回给我。
+                请直接返回提示词，不需要其他任何额外的文字，特别是引用参考和来源，不要出现任何的引用和来源，还有markdown语法字符也不能出现。
+
+``` 目标：基于多维度数据生成豆粕主力合约（{raw_data['main_contract']}）下一个交易日（{raw_data['next_day']}）的量化策略，不要出现任何的引用和来源。
+一、实时价格与技术指标
+{trading_data['price_analysis']}
+{trading_data['technical_analysis']}
+{trading_data['volume_analysis']}
+二、基本面与市场情绪 【请补充供应端数据（进口大豆到港量、油厂开机率、豆粕库存）、需求端数据（饲料企业采购量、替代品价格）】
+三、国际市场联动
+1、【请补充隔夜CBOT美豆走势情况】
+2、【请补充USDA出口销售数据和巴西贴水情况】
+3、人民币汇率：{raw_data['usd_cny']}。
+四、资金与政策风险
+1、【请补充机构行为，包括净空、净多头寸、机构仓位变化情况】。
+2、政策风险 中美关税：美豆进口关税138%，远月成本支撑，但5月前到港压力主导。
+3、【请补充天气炒作情况】
+4、【请补充基差变化】
+5、【请补充突发事件】 ```
+"""
+        logger.info(f"生成提示词：{prompt}")
         try:
             response = client.chat.completions.create(
                 model="bot-20250329163710-8zcqm",
-                messages=[{"role": "system", "content": "你是DeepSeek，是一个金融领域专家"}, {"role": "user", "content": prompt}],
+                messages=[{"role": "system", "content": "你是DeepSeek，是一个提示词工程专家"}, {"role": "user", "content": prompt}],
+                stream=False
+            )
+            content = response.choices[0].message.content
+            logger.info(f"生成提示词：{content}")
+
+            response = client.chat.completions.create(
+                model="bot-20250329163710-8zcqm",
+                messages=[{"role": "system", "content": "现在你是一个豆粕期货量化策略专家，请根据我给你的提示词，生成一份豆粕期货交易操作策略。"}, {"role": "user", "content": content}],
                 stream=True
             )
-            
+
             return StreamingResponse(
                 stream_response(response, request, date),
                 media_type="text/event-stream",

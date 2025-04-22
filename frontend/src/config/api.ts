@@ -45,6 +45,9 @@ export const API_ENDPOINTS = {
   dualma: {
     weekly: `${API_BASE_URL}/dual_ma/weekly`,
     backtest: `${API_BASE_URL}/dual_ma/backtest`
+  },grid: {
+    data: `${API_BASE_URL}/grid/data`,
+    backtest: `${API_BASE_URL}/grid/backtest`,
   },
   news: {
     daily: `${API_BASE_URL}/news/daily`,
