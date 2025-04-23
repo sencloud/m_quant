@@ -29,6 +29,18 @@ const Header: React.FC = () => {
       ),
     },
     {
+      key: 'stock-futures',
+      label: (
+        <Link to="/pro/stock-futures" className="flex items-center py-2 px-4 hover:bg-gray-50">
+          <CrownOutlined className="mr-3 text-orange-500 text-xl" />
+          <div>
+            <div className="font-medium">期股联动</div>
+            <div className="text-xs text-gray-500">豆粕期货与相关股票联动分析</div>
+          </div>
+        </Link>
+      ),
+    },
+    {
       key: 'multi-variety-arbitrage',
       label: (
         <Link to="/multi-variety-arbitrage" className="flex items-center py-2 px-4 hover:bg-gray-50">
@@ -266,6 +278,17 @@ const Header: React.FC = () => {
                 <div>
                   <div className="font-medium">历史规律</div>
                   <div className="text-xs text-gray-500">基于历史数据的深度分析</div>
+                </div>
+              </NavLink>
+              <NavLink
+                to="/pro/stock-futures"
+                className="flex items-center py-2 px-4 hover:bg-gray-50 rounded-md"
+                onClick={() => setIsMenuOpen(false)}
+              >
+                <CrownOutlined className="mr-3 text-orange-500 text-xl" />
+                <div>
+                  <div className="font-medium">期股联动</div>
+                  <div className="text-xs text-gray-500">豆粕期货与相关股票联动分析</div>
                 </div>
               </NavLink>
               <NavLink

@@ -15,6 +15,7 @@ import TermsOfService from './pages/TermsOfService';
 import Disclaimer from './pages/Disclaimer';
 import Signals from './pages/Signals';
 import MultiVarietyArbitrage from './pages/MultiVarietyArbitrage';
+import StockFutures from './pages/pro/StockFutures';
 
 const queryClient = new QueryClient();
 
@@ -31,6 +32,7 @@ const App: React.FC = () => {
           <Route path="/research/core-factor" element={<CoreFactorAnalysisPage />} />
           <Route path="/research/options-strategy" element={<OptionsStrategyPage />} />
           <Route path="/pro-analysis" element={<ProAnalysis />} />
+          <Route path="/pro/stock-futures" element={<StockFutures />} />
           <Route path="/news-analysis" element={<NewsAnalysis />} />
           <Route path="/agents" element={<Agents />} />
           <Route path="/multi-variety-arbitrage" element={<MultiVarietyArbitrage />} />
