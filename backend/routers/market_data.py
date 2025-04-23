@@ -6,6 +6,7 @@ from models.market_data import FuturesData, ETFData, OptionsData, InventoryData,
 from utils.logger import logger
 from datetime import datetime, timedelta
 import pandas as pd
+import numpy as np
 from pathlib import Path
 from services.support_resistance import SupportResistanceService
 
@@ -382,8 +383,50 @@ async def get_support_resistance_data(period: str = "daily"):
         sr_service = SupportResistanceService()
         sr_levels = sr_service.get_sr_levels(df, period)
         
-        logger.info(f"成功返回支撑阻力数据，共{len(sr_levels)}个水平")
-        return sr_levels
+        # 准备K线数据
+        market_data = []
+        for _, row in df.iterrows():
+            # 处理无效的浮点数值
+            def clean_float(value):
+                if pd.isna(value) or np.isinf(value):
+                    return 0.0
+                return float(value)
+            
+            market_data.append({
+                "date": row['date'].strftime('%Y-%m-%d %H:%M:%S'),  # 使用 date 而不是 time
+                "open": clean_float(row['open']),
+                "high": clean_float(row['high']),
+                "low": clean_float(row['low']),
+                "close": clean_float(row['close']),
+                "volume": clean_float(row['vol']) if 'vol' in row else 0,
+                "support_level": None,  # 添加支撑位
+                "resistance_level": None,  # 添加阻力位
+                "signal": 0  # 添加信号，0表示无信号，1表示买入，-1表示卖出
+            })
+        
+        # 更新支撑位和阻力位
+        for sr_level in sr_levels:
+            level_price = sr_level['price']
+            level_type = sr_level['type']
+            start_time = datetime.strptime(sr_level['start_time'], '%Y-%m-%d %H:%M:%S')
+            break_time = datetime.strptime(sr_level['break_time'], '%Y-%m-%d %H:%M:%S') if sr_level['break_time'] else None
+            
+            for data in market_data:
+                data_time = datetime.strptime(data['date'], '%Y-%m-%d %H:%M:%S')
+                if data_time >= start_time and (not break_time or data_time <= break_time):
+                    if level_type == 'Support':
+                        data['support_level'] = level_price
+                        # 当价格接近支撑位时产生买入信号
+                        if abs(data['low'] - level_price) / level_price < 0.01:  # 1%阈值
+                            data['signal'] = 1
+                    else:  # Resistance
+                        data['resistance_level'] = level_price
+                        # 当价格接近阻力位时产生卖出信号
+                        if abs(data['high'] - level_price) / level_price < 0.01:  # 1%阈值
+                            data['signal'] = -1
+        
+        logger.info(f"成功返回支撑阻力数据，共{len(sr_levels)}个水平和{len(market_data)}条K线数据")
+        return market_data
         
     except Exception as e:
         logger.error(f"获取支撑阻力数据失败: {str(e)}")
