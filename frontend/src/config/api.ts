@@ -16,7 +16,8 @@ export const API_ENDPOINTS = {
     technical: `${API_BASE_URL}/market/technical`,
     historical: `${API_BASE_URL}/market/futures/historical`,
     monthlyProbability: `${API_BASE_URL}/market/futures/monthly-probability`,
-    costComparison: `${API_BASE_URL}/market/futures/cost-comparison`
+    costComparison: `${API_BASE_URL}/market/futures/cost-comparison`,
+    supportResistance: `${API_BASE_URL}/market/support-resistance`
   },
   analysis: {
     fundamental: `${API_BASE_URL}/fundamental/analysis`,
@@ -45,7 +46,8 @@ export const API_ENDPOINTS = {
   dualma: {
     weekly: `${API_BASE_URL}/dual_ma/weekly`,
     backtest: `${API_BASE_URL}/dual_ma/backtest`
-  },grid: {
+  },
+  grid: {
     data: `${API_BASE_URL}/grid/data`,
     backtest: `${API_BASE_URL}/grid/backtest`,
   },
@@ -53,5 +55,9 @@ export const API_ENDPOINTS = {
     daily: `${API_BASE_URL}/news/daily`,
     analysis: `${API_BASE_URL}/news/analysis`,
     analyze: `${API_BASE_URL}/news/analyze`
+  },
+  supportResistance: {
+    data: `${API_BASE_URL}/support_resistance/data`,
+    backtest: `${API_BASE_URL}/support_resistance/backtest`
   }
 }; 

@@ -6,6 +6,7 @@ import ArbitrageStrategy from '../components/trading/ArbitrageStrategy';
 import TrendFollowStrategy from '../components/trading/TrendFollowStrategy';
 import OBVADXEMAStrategy from '../components/trading/OBVADXEMAStrategy';
 import GridStrategy from '../components/trading/GridStrategy';
+import SupportResistanceStrategy from '../components/trading/SupportResistanceStrategy';
 import { ChartBarIcon, ChartPieIcon, ArrowsRightLeftIcon, ChevronDownIcon, Squares2X2Icon } from '@heroicons/react/24/outline';
 
 interface StrategyCardProps {
@@ -77,6 +78,18 @@ const Trading: React.FC = () => {
         </div>
 
         <StrategyCard
+          title="豆粕支撑阻力策略"
+          tags={[
+            { text: "技术面策略", color: "text-blue-800 bg-blue-100" },
+            { text: "趋势跟踪", color: "text-purple-800 bg-purple-100" },
+            { text: "已回测", color: "text-green-800 bg-green-100" }
+          ]}
+          icon={<ChartBarIcon />}
+        >
+          <SupportResistanceStrategy />
+        </StrategyCard>
+
+        <StrategyCard
           title="豆粕近远月套利策略"
           tags={[
             { text: "套利策略", color: "text-indigo-800 bg-indigo-100" },
@@ -88,7 +101,7 @@ const Trading: React.FC = () => {
           <ArbitrageStrategy />
         </StrategyCard>
         
-        <StrategyCard
+        {/* <StrategyCard
           title="豆粕网格交易策略"
           tags={[
             { text: "网格策略", color: "text-purple-800 bg-purple-100" },
@@ -98,7 +111,7 @@ const Trading: React.FC = () => {
           icon={<Squares2X2Icon />}
         >
           <GridStrategy />
-        </StrategyCard>
+        </StrategyCard> */}
 
         {/* <StrategyCard
           title="豆粕均线趋势跟随策略（以M2501合约为例）"

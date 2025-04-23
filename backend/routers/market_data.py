@@ -5,6 +5,9 @@ from services.opt_service import OptService
 from models.market_data import FuturesData, ETFData, OptionsData, InventoryData, TechnicalIndicators, OptionsHedgeData, OptionBasic, OptionDaily, CostComparisonData, PriceRangeAnalysis
 from utils.logger import logger
 from datetime import datetime, timedelta
+import pandas as pd
+from pathlib import Path
+from services.support_resistance import SupportResistanceService
 
 router = APIRouter()
 
@@ -303,4 +306,85 @@ async def get_price_range_analysis(
         return data
     except Exception as e:
         logger.error(f"价格区间分析数据请求失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/support-resistance")
+async def get_support_resistance_data(period: str = "daily"):
+    """获取支撑阻力数据"""
+    logger.info(f"收到支撑阻力数据请求 - 周期: {period}")
+    try:
+        # 根据周期选择数据文件
+        if period == "weekly":
+            data_path = Path("daily_data/M2501.DCE_future_weekly_20100101_20251231.csv")
+        elif period == "30min":
+            data_path = Path("daily_data/M2501.DCE_future_30min_20100101_20251231.csv")
+        else:  # daily
+            data_path = Path("daily_data/M2501.DCE_future_daily_20100101_20251231.csv")
+        
+        if not data_path.exists():
+            raise HTTPException(status_code=404, detail=f"数据文件不存在: {data_path}")
+            
+        # 读取数据
+        df = pd.read_csv(data_path)
+        
+        # 处理字段映射
+        if "30min" in str(data_path):
+            df = df.rename(columns={
+                "时间": "date",
+                "开盘": "open",
+                "收盘": "close",
+                "最高": "high",
+                "最低": "low",
+                "成交量": "vol",
+                "成交额": "amount"
+            })
+        else:
+            df = df.rename(columns={
+                "datetime": "date",
+                "open": "open",
+                "close": "close",
+                "high": "high",
+                "low": "low",
+                "volume": "vol",
+                "amount": "amount"
+            })
+            
+        # 确保数值列的类型正确
+        numeric_columns = ['open', 'high', 'low', 'close', 'vol']
+        for col in numeric_columns:
+            df[col] = pd.to_numeric(df[col], errors='coerce')
+        
+        # 处理日期列
+        if "30min" in str(data_path):
+            # 对于30分钟数据，日期格式可能不同，需要特殊处理
+            df['date'] = pd.to_datetime(df['date'], format='%Y-%m-%d %H:%M:%S')
+        else:
+            # 对于日线和周线数据，尝试不同的日期格式
+            try:
+                # 先尝试 YYYYMMDD 格式
+                df['date'] = pd.to_datetime(df['date'], format='%Y%m%d')
+            except ValueError:
+                try:
+                    # 再尝试 YYYY-MM-DD 格式
+                    df['date'] = pd.to_datetime(df['date'], format='%Y-%m-%d')
+                except ValueError:
+                    # 如果都失败，使用混合格式解析
+                    df['date'] = pd.to_datetime(df['date'])
+            
+        # 确保数据按时间排序
+        df = df.sort_values('date')
+        df = df.reset_index(drop=True)
+        
+        # 打印一些调试信息
+        logger.debug(f"数据日期范围: {df['date'].min()} to {df['date'].max()}")
+        
+        # 使用SupportResistanceService计算支撑位和阻力位
+        sr_service = SupportResistanceService()
+        sr_levels = sr_service.get_sr_levels(df, period)
+        
+        logger.info(f"成功返回支撑阻力数据，共{len(sr_levels)}个水平")
+        return sr_levels
+        
+    except Exception as e:
+        logger.error(f"获取支撑阻力数据失败: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e)) 
