@@ -2,11 +2,7 @@ import React, { useState } from 'react';
 import ReactECharts from 'echarts-for-react';
 import { CompanyInfo, StockFuturesData, TradingSignal } from '../../types/stockFutures';
 import Layout from '../../components/layout/Layout';
-import { Card, Skeleton, Tabs, Tag, Table, Divider, Row, Col, Typography, Descriptions, Space } from 'antd';
-import { LineChartOutlined, FundOutlined, TeamOutlined, InfoCircleOutlined, StockOutlined } from '@ant-design/icons';
 import type { EChartsOption } from 'echarts';
-
-const { Title, Paragraph } = Typography;
 
 const COMPANIES: CompanyInfo[] = [
   { code: '300999.SZ', name: '金龙鱼', type: 'upstream', description: '大豆压榨及食用油生产' },
@@ -135,11 +131,10 @@ const StockFutures: React.FC = () => {
     xAxis: {
       type: 'category',
       data: data.map(item => item[0]),
-      scale: true
+      boundaryGap: true
     },
     yAxis: {
       type: 'value',
-      scale: true,
       splitArea: { show: true }
     },
     dataZoom: [
@@ -226,98 +221,6 @@ const StockFutures: React.FC = () => {
     ]
   });
 
-  const companyColumns = [
-    {
-      title: '代码',
-      dataIndex: 'code',
-      key: 'code',
-      width: 120,
-    },
-    {
-      title: '名称',
-      dataIndex: 'name',
-      key: 'name',
-      width: 120,
-    },
-    {
-      title: '类型',
-      dataIndex: 'type',
-      key: 'type',
-      width: 120,
-      render: (type: string) => {
-        const typeMap = {
-          upstream: { text: '上游', color: 'blue' },
-          midstream: { text: '中游', color: 'green' },
-          downstream: { text: '下游', color: 'orange' },
-          other: { text: '其他', color: 'gray' },
-        };
-        const { text, color } = typeMap[type as keyof typeof typeMap];
-        return <Tag color={color}>{text}</Tag>;
-      },
-    },
-    {
-      title: '描述',
-      dataIndex: 'description',
-      key: 'description',
-      render: (text: string) => (
-        <div className="flex items-center">
-          <span className="mr-2">{text}</span>
-          <InfoCircleOutlined className="text-gray-400" />
-        </div>
-      )
-    },
-    {
-      title: '操作',
-      key: 'action',
-      width: 120,
-      render: (_: any, record: CompanyInfo) => (
-        <a onClick={() => setSelectedCompany(record)}>
-          <Space>
-            <StockOutlined />
-            查看详情
-          </Space>
-        </a>
-      ),
-    }
-  ];
-
-  const signalColumns = [
-    {
-      title: '时间',
-      dataIndex: 'timestamp',
-      key: 'timestamp',
-      width: 180,
-    },
-    {
-      title: '类型',
-      dataIndex: 'type',
-      key: 'type',
-      width: 120,
-      render: (type: string) => {
-        const typeMap = {
-          positive: { text: '正向联动', color: 'success' },
-          negative: { text: '反向联动', color: 'error' },
-          arbitrage: { text: '套利机会', color: 'processing' },
-        };
-        const { text, color } = typeMap[type as keyof typeof typeMap];
-        return <Tag color={color}>{text}</Tag>;
-      },
-    },
-    {
-      title: '描述',
-      dataIndex: 'description',
-      key: 'description',
-    },
-    {
-      title: '操作',
-      key: 'action',
-      width: 120,
-      render: (_: any, record: TradingSignal) => (
-        <a onClick={() => console.log('查看详情', record)}>查看详情</a>
-      ),
-    },
-  ];
-
   const CompanyDetail = ({ company }: { company: CompanyInfo }) => {
     const details = COMPANY_DETAILS[company.code as keyof typeof COMPANY_DETAILS];
     if (!details) return null;
@@ -325,55 +228,75 @@ const StockFutures: React.FC = () => {
     return (
       <div className="space-y-6">
         <div className="flex justify-between items-center">
-          <Title level={4}>{company.name} ({company.code})</Title>
-          <Tag color="blue">实时: 26.80 +2.15%</Tag>
+          <h4 className="text-xl font-bold">{company.name} ({company.code})</h4>
+          <span className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium">
+            实时: 26.80 +2.15%
+          </span>
         </div>
         
-        <Descriptions bordered size="small" column={2}>
-          <Descriptions.Item label="公司全称">{details.fullName}</Descriptions.Item>
-          <Descriptions.Item label="所属行业">{details.industry}</Descriptions.Item>
-          <Descriptions.Item label="市值">{details.marketCap}</Descriptions.Item>
-          <Descriptions.Item label="市盈率">{details.peRatio}</Descriptions.Item>
-          <Descriptions.Item label="市净率">{details.pbRatio}</Descriptions.Item>
-        </Descriptions>
+        <div className="grid grid-cols-2 gap-4 border rounded-lg p-4 bg-gray-50">
+          <div className="space-y-2">
+            <div className="flex justify-between">
+              <span className="text-gray-600">公司全称</span>
+              <span className="font-medium">{details.fullName}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-600">所属行业</span>
+              <span className="font-medium">{details.industry}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-600">市值</span>
+              <span className="font-medium">{details.marketCap}</span>
+            </div>
+          </div>
+          <div className="space-y-2">
+            <div className="flex justify-between">
+              <span className="text-gray-600">市盈率</span>
+              <span className="font-medium">{details.peRatio}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-600">市净率</span>
+              <span className="font-medium">{details.pbRatio}</span>
+            </div>
+          </div>
+        </div>
 
         <div>
-          <Title level={5}>主营业务</Title>
-          <ul className="list-disc pl-5">
+          <h5 className="text-lg font-semibold mb-3">主营业务</h5>
+          <ul className="list-disc pl-5 space-y-1">
             {details.mainBusiness.map((item, index) => (
               <li key={index} className="text-gray-700">{item}</li>
             ))}
           </ul>
         </div>
 
-        <Row gutter={16}>
-          <Col span={12}>
-            <Card size="small" title="核心优势" className="h-full">
-              <ul className="list-disc pl-5">
-                {details.advantages.map((item, index) => (
-                  <li key={index} className="text-gray-700">{item}</li>
-                ))}
-              </ul>
-            </Card>
-          </Col>
-          <Col span={12}>
-            <Card size="small" title="风险提示" className="h-full">
-              <ul className="list-disc pl-5">
-                {details.risks.map((item, index) => (
-                  <li key={index} className="text-gray-700 text-sm">{item}</li>
-                ))}
-              </ul>
-            </Card>
-          </Col>
-        </Row>
+        <div className="grid grid-cols-2 gap-6">
+          <div className="bg-white rounded-lg border p-4">
+            <h6 className="text-base font-semibold mb-3">核心优势</h6>
+            <ul className="list-disc pl-5 space-y-1">
+              {details.advantages.map((item, index) => (
+                <li key={index} className="text-gray-700">{item}</li>
+              ))}
+            </ul>
+          </div>
+          <div className="bg-white rounded-lg border p-4">
+            <h6 className="text-base font-semibold mb-3">风险提示</h6>
+            <ul className="list-disc pl-5 space-y-1">
+              {details.risks.map((item, index) => (
+                <li key={index} className="text-gray-700 text-sm">{item}</li>
+              ))}
+            </ul>
+          </div>
+        </div>
 
-        <Card size="small" title="最新动态">
-          <ul className="list-disc pl-5">
+        <div className="bg-white rounded-lg border p-4">
+          <h6 className="text-base font-semibold mb-3">最新动态</h6>
+          <ul className="list-disc pl-5 space-y-1">
             {details.recentNews.map((item, index) => (
               <li key={index} className="text-gray-700">{item}</li>
             ))}
           </ul>
-        </Card>
+        </div>
       </div>
     );
   };
@@ -393,92 +316,173 @@ const StockFutures: React.FC = () => {
           </p>
         </div>
 
-        <Tabs
-          activeKey={activeTab}
-          onChange={setActiveTab}
-          items={[
-            {
-              key: 'overview',
-              label: (
-                <span>
-                  <FundOutlined />
-                  &nbsp; 市场概览
+        <div className="mb-8">
+          <div className="border-b border-gray-200">
+            <nav className="-mb-px flex space-x-8">
+              <button
+                onClick={() => setActiveTab('overview')}
+                className={`
+                  py-4 px-1 border-b-2 font-medium text-sm
+                  ${activeTab === 'overview'
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}
+                `}
+              >
+                <span className="flex items-center">
+                  <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z" />
+                  </svg>
+                  市场概览
                 </span>
-              ),
-              children: (
-                <div className="space-y-6">
-                  <Card>
-                    <Table
-                      columns={companyColumns}
-                      dataSource={COMPANIES}
-                      rowKey="code"
-                      pagination={false}
-                      size="small"
-                      onRow={(record) => ({
-                        onClick: () => setSelectedCompany(record),
-                        className: 'cursor-pointer hover:bg-gray-50'
-                      })}
-                    />
-                  </Card>
-                  
-                  <Row gutter={16}>
-                    <Col span={24}>
-                      <Card title={`${selectedCompany.name} - 股票行情`} className="mb-6">
-                        <ReactECharts 
-                          option={getKLineOption(generateKLineData(90))} 
-                          style={{ height: '400px' }} 
-                        />
-                      </Card>
-                    </Col>
-                  </Row>
-
-                  <Card>
-                    <CompanyDetail company={selectedCompany} />
-                  </Card>
-                </div>
-              ),
-            },
-            {
-              key: 'signals',
-              label: (
-                <span>
-                  <LineChartOutlined />
-                  &nbsp; 联动信号
+              </button>
+              <button
+                onClick={() => setActiveTab('signals')}
+                className={`
+                  py-4 px-1 border-b-2 font-medium text-sm
+                  ${activeTab === 'signals'
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}
+                `}
+              >
+                <span className="flex items-center">
+                  <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                  </svg>
+                  联动信号
                 </span>
-              ),
-              children: (
-                <div className="space-y-6">
-                  <Card>
-                    {loading ? (
-                      <Skeleton active />
-                    ) : (
-                      <Table
-                        columns={signalColumns}
-                        dataSource={signals}
-                        rowKey={(record) => record.timestamp}
-                        pagination={{ pageSize: 10 }}
-                      />
-                    )}
-                  </Card>
+              </button>
+            </nav>
+          </div>
 
-                  <Card title="期现价差">
-                    <ReactECharts option={getBasicOption()} style={{ height: '400px' }} />
-                  </Card>
+          <div className="mt-6">
+            {activeTab === 'overview' ? (
+              <div className="space-y-6">
+                <div className="bg-white rounded-lg shadow overflow-hidden">
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">代码</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">名称</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">类型</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">描述</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">操作</th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {COMPANIES.map((company) => (
+                          <tr
+                            key={company.code}
+                            onClick={() => setSelectedCompany(company)}
+                            className="hover:bg-gray-50 cursor-pointer"
+                          >
+                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{company.code}</td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{company.name}</td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                              <span className={`
+                                px-2 py-1 rounded-full text-xs font-medium
+                                ${company.type === 'upstream' ? 'bg-blue-100 text-blue-800' :
+                                  company.type === 'midstream' ? 'bg-green-100 text-green-800' :
+                                  company.type === 'downstream' ? 'bg-orange-100 text-orange-800' :
+                                  'bg-gray-100 text-gray-800'}
+                              `}>
+                                {company.type === 'upstream' ? '上游' :
+                                 company.type === 'midstream' ? '中游' :
+                                 company.type === 'downstream' ? '下游' : '其他'}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 text-sm text-gray-500">{company.description}</td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-blue-600 hover:text-blue-800">
+                              <button className="flex items-center">
+                                <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                </svg>
+                                查看详情
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
-              ),
-            }
-          ]}
-        />
 
-        <Divider className="my-12" />
+                <div className="bg-white rounded-lg shadow p-6">
+                  <h3 className="text-lg font-medium text-gray-900 mb-4">{selectedCompany.name} - 股票行情</h3>
+                  <ReactECharts 
+                    option={getKLineOption(generateKLineData(90))} 
+                    style={{ height: '400px' }} 
+                  />
+                </div>
+
+                <div className="bg-white rounded-lg shadow p-6">
+                  <CompanyDetail company={selectedCompany} />
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-6">
+                <div className="bg-white rounded-lg shadow overflow-hidden">
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">时间</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">类型</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">描述</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">操作</th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {signals.map((signal) => (
+                          <tr key={signal.timestamp} className="hover:bg-gray-50">
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{signal.timestamp}</td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <span className={`
+                                px-2 py-1 rounded-full text-xs font-medium
+                                ${signal.type === 'positive' ? 'bg-green-100 text-green-800' :
+                                  signal.type === 'negative' ? 'bg-red-100 text-red-800' :
+                                  'bg-blue-100 text-blue-800'}
+                              `}>
+                                {signal.type === 'positive' ? '正向联动' :
+                                 signal.type === 'negative' ? '反向联动' : '套利机会'}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 text-sm text-gray-500">{signal.description}</td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-blue-600 hover:text-blue-800">
+                              <button className="flex items-center">
+                                <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                </svg>
+                                查看详情
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                <div className="bg-white rounded-lg shadow p-6">
+                  <h3 className="text-lg font-medium text-gray-900 mb-4">期现价差</h3>
+                  <ReactECharts option={getBasicOption()} style={{ height: '400px' }} />
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <hr className="my-12 border-gray-200" />
         
-        <Card className="mt-8">
+        <div className="bg-white rounded-lg shadow p-6">
           <div className="prose max-w-none">
             <h2 className="text-2xl font-bold mb-6">策略说明</h2>
-            <p>本策略通过监测豆粕期货与相关股票的价格联动，捕捉产业链利润传导、市场预期差及跨市场套利机会，形成3-6个月的中长期配置。</p>
+            <p className="text-gray-600">本策略通过监测豆粕期货与相关股票的价格联动，捕捉产业链利润传导、市场预期差及跨市场套利机会，形成3-6个月的中长期配置。</p>
             
             <h3 className="text-xl font-semibold mt-8 mb-4">核心逻辑</h3>
-            <ul>
+            <ul className="space-y-2 text-gray-600">
               <li><strong>产业链利润传导</strong>：豆粕期货价格变动 → 影响上下游企业利润 → 驱动股价波动</li>
               <li><strong>跨市场预期差</strong>：期货市场反映商品供需，股票市场反映企业盈利，两者背离时存在套利空间</li>
               <li><strong>周期共振</strong>：结合养殖周期、种植周期与政策周期，预判联动趋势</li>
@@ -488,7 +492,7 @@ const StockFutures: React.FC = () => {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <div className="bg-gray-50 p-4 rounded-lg">
                 <h4 className="text-lg font-semibold text-gray-900">1. 正向联动信号</h4>
-                <ul className="mt-2 space-y-2">
+                <ul className="mt-2 space-y-2 text-gray-600">
                   <li>豆粕期货连续3个月上涨，且基差从贴水转为升水</li>
                   <li>上游压榨企业PB分位数低于历史30%</li>
                   <li>操作建议：做多豆粕期货 + 做多压榨企业股票</li>
@@ -497,7 +501,7 @@ const StockFutures: React.FC = () => {
 
               <div className="bg-gray-50 p-4 rounded-lg">
                 <h4 className="text-lg font-semibold text-gray-900">2. 反向联动信号</h4>
-                <ul className="mt-2 space-y-2">
+                <ul className="mt-2 space-y-2 text-gray-600">
                   <li>豆粕期货跌幅 {'>'} 15%（3个月内），且生猪存栏量环比回升</li>
                   <li>下游养殖企业PE低于历史10%</li>
                   <li>操作建议：做空豆粕期货 + 做多养殖企业股票</li>
@@ -506,7 +510,7 @@ const StockFutures: React.FC = () => {
 
               <div className="bg-gray-50 p-4 rounded-lg">
                 <h4 className="text-lg font-semibold text-gray-900">3. 跨市场套利信号</h4>
-                <ul className="mt-2 space-y-2">
+                <ul className="mt-2 space-y-2 text-gray-600">
                   <li>压榨利润 {'>'} 500元/吨，且压榨企业股价未同步上涨</li>
                   <li>期货价格与股票指数60日相关系数 {'<'} -0.3</li>
                   <li>操作建议：做多压榨企业股票 + 做空豆粕期货</li>
@@ -514,7 +518,7 @@ const StockFutures: React.FC = () => {
               </div>
             </div>
           </div>
-        </Card>
+        </div>
       </div>
     </Layout>
   );
