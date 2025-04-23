@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import ReactECharts from 'echarts-for-react';
 import { CompanyInfo, StockFuturesData, TradingSignal } from '../../types/stockFutures';
 import Layout from '../../components/layout/Layout';
@@ -111,11 +111,124 @@ const COMPANY_DETAILS = {
   // ... 其他公司详情可以按需添加
 };
 
+// 扩展信号的详细信息
+const SIGNAL_DETAILS = {
+  'positive': {
+    title: '正向联动信号分析',
+    indicators: [
+      { name: '期货趋势', value: '连续上涨', status: 'positive' },
+      { name: '基差变化', value: '贴水转升水', status: 'positive' },
+      { name: '现货价格', value: '4280元/吨', status: 'neutral' },
+      { name: '期货主力', value: '4350元/吨', status: 'neutral' },
+      { name: '基差水平', value: '+70元/吨', status: 'positive' },
+    ],
+    technicalAnalysis: {
+      momentum: { name: 'MACD', value: '金叉', interpretation: '多头动能增强' },
+      trend: { name: 'MA', value: '多头排列', interpretation: '趋势向上' },
+      volatility: { name: 'Bollinger Bands', value: '通道上移', interpretation: '波动率可控' }
+    },
+    fundamentals: [
+      '南美大豆减产预期增强',
+      '国内养殖需求逐步恢复',
+      '压榨企业库存处于低位',
+      '现货市场成交活跃度提升'
+    ],
+    relatedStocks: [
+      { code: '300999.SZ', name: '金龙鱼', change: '+2.15%', reason: '压榨利润改善' },
+      { code: '000930.SZ', name: '中粮科技', change: '+1.88%', reason: '库存价值提升' }
+    ],
+    tradingSuggestions: [
+      '期货：可考虑逢低做多M2405合约',
+      '现货：适当补库，控制库存周期',
+      '股票：关注上游压榨企业机会',
+      '套利：期现正套机会显现'
+    ],
+    riskFactors: [
+      '美豆价格波动风险',
+      '人民币汇率波动风险',
+      '下游需求不及预期风险'
+    ]
+  },
+  'negative': {
+    title: '反向联动信号分析',
+    indicators: [
+      { name: '期货跌幅', value: '-15.3%', status: 'negative' },
+      { name: '生猪存栏', value: '环比+5.2%', status: 'positive' },
+      { name: '养殖利润', value: '320元/头', status: 'neutral' },
+      { name: '豆粕库存', value: '98.5万吨', status: 'negative' },
+      { name: '压榨开机率', value: '52.3%', status: 'negative' },
+    ],
+    technicalAnalysis: {
+      momentum: { name: 'RSI', value: '超卖', interpretation: '下跌动能减弱' },
+      trend: { name: 'KDJ', value: '死叉', interpretation: '短期看空' },
+      volatility: { name: 'ATR', value: '扩大', interpretation: '波动加剧' }
+    },
+    fundamentals: [
+      '美豆丰产预期强化',
+      '生猪存栏持续回升',
+      '豆粕库存压力较大',
+      '压榨利润持续承压'
+    ],
+    relatedStocks: [
+      { code: '002714.SZ', name: '牧原股份', change: '+3.25%', reason: '成本预期改善' },
+      { code: '300498.SZ', name: '温氏股份', change: '+2.76%', reason: '养殖周期向上' }
+    ],
+    tradingSuggestions: [
+      '期货：可考虑逢高做空M2405合约',
+      '现货：维持低库存运行',
+      '股票：关注下游养殖企业机会',
+      '套利：期现反套可行性增加'
+    ],
+    riskFactors: [
+      '南美天气异常风险',
+      '生猪存栏不及预期风险',
+      '政策调控风险'
+    ]
+  },
+  'arbitrage': {
+    title: '跨市场套利信号分析',
+    indicators: [
+      { name: '压榨利润', value: '628元/吨', status: 'positive' },
+      { name: '相关系数', value: '-0.35', status: 'positive' },
+      { name: '基差水平', value: '-120元/吨', status: 'negative' },
+      { name: '股债性价比', value: '1.25', status: 'positive' },
+      { name: '期限结构', value: '正向递增', status: 'neutral' },
+    ],
+    technicalAnalysis: {
+      momentum: { name: 'CMF', value: '资金流入', interpretation: '市场情绪改善' },
+      trend: { name: 'EMV', value: '底部企稳', interpretation: '市场动能转换' },
+      volatility: { name: 'VWAP', value: '支撑明显', interpretation: '价格结构稳定' }
+    },
+    fundamentals: [
+      '基差修复预期增强',
+      '股票估值处于低位',
+      '期货升水结构改善',
+      '产业资金入场迹象明显'
+    ],
+    relatedStocks: [
+      { code: '000930.SZ', name: '中粮科技', change: '-1.25%', reason: '低估机会显现' },
+      { code: '300999.SZ', name: '金龙鱼', change: '-0.88%', reason: '市场预期差' }
+    ],
+    tradingSuggestions: [
+      '期货：择机做空远月合约',
+      '现货：考虑买入库存',
+      '股票：布局低估值标的',
+      '套利：期现套利性价比提升'
+    ],
+    riskFactors: [
+      '市场流动性风险',
+      '政策监管风险',
+      '基本面预期差风险'
+    ]
+  }
+};
+
 const StockFutures: React.FC = () => {
   const [activeTab, setActiveTab] = useState('overview');
   const [signals, setSignals] = useState<TradingSignal[]>(MOCK_SIGNALS);
   const [loading, setLoading] = useState(false);
   const [selectedCompany, setSelectedCompany] = useState<CompanyInfo>(COMPANIES[0]);
+  const [selectedSignal, setSelectedSignal] = useState<TradingSignal>(MOCK_SIGNALS[0]);
 
   const getKLineOption = (data: any[]): EChartsOption => ({
     tooltip: {
@@ -230,7 +343,7 @@ const StockFutures: React.FC = () => {
         <div className="flex justify-between items-center">
           <h4 className="text-xl font-bold">{company.name} ({company.code})</h4>
           <span className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium">
-            实时: 26.80 +2.15%
+            实时: 26.80 <span className="text-red-600">+2.15%</span>
           </span>
         </div>
         
@@ -296,6 +409,105 @@ const StockFutures: React.FC = () => {
               <li key={index} className="text-gray-700">{item}</li>
             ))}
           </ul>
+        </div>
+      </div>
+    );
+  };
+
+  const SignalDetail = ({ signal }: { signal: TradingSignal }) => {
+    const details = SIGNAL_DETAILS[signal.type as keyof typeof SIGNAL_DETAILS];
+    if (!details) return null;
+
+    return (
+      <div className="space-y-6">
+        <div className="flex justify-between items-center">
+          <h4 className="text-xl font-bold">{details.title}</h4>
+          <span className={`
+            px-3 py-1 rounded-full text-sm font-medium
+            ${signal.type === 'positive' ? 'bg-green-100 text-green-800' :
+              signal.type === 'negative' ? 'bg-red-100 text-red-800' :
+              'bg-blue-100 text-blue-800'}
+          `}>
+            {signal.type === 'positive' ? '正向联动' :
+             signal.type === 'negative' ? '反向联动' : '套利机会'}
+          </span>
+        </div>
+
+        <div className="grid grid-cols-5 gap-4">
+          {details.indicators.map((indicator, index) => (
+            <div key={index} className="bg-gray-50 rounded-lg p-3 text-center">
+              <div className="text-sm text-gray-500 mb-1">{indicator.name}</div>
+              <div className={`font-medium ${
+                indicator.status === 'positive' ? 'text-green-600' :
+                indicator.status === 'negative' ? 'text-red-600' :
+                'text-gray-600'
+              }`}>{indicator.value}</div>
+            </div>
+          ))}
+        </div>
+
+        <div className="grid grid-cols-2 gap-6">
+          <div className="bg-white rounded-lg border p-4">
+            <h6 className="text-base font-semibold mb-3">技术分析</h6>
+            <div className="space-y-3">
+              {Object.entries(details.technicalAnalysis).map(([key, analysis]) => (
+                <div key={key} className="flex items-center justify-between text-sm">
+                  <span className="text-gray-500">{analysis.name}</span>
+                  <div className="text-right">
+                    <div className="font-medium text-gray-900">{analysis.value}</div>
+                    <div className="text-xs text-gray-500">{analysis.interpretation}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="bg-white rounded-lg border p-4">
+            <h6 className="text-base font-semibold mb-3">基本面因素</h6>
+            <ul className="list-disc pl-5 space-y-1">
+              {details.fundamentals.map((item, index) => (
+                <li key={index} className="text-gray-600">{item}</li>
+              ))}
+            </ul>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-lg border p-4">
+          <h6 className="text-base font-semibold mb-3">相关个股表现</h6>
+          <div className="grid grid-cols-2 gap-4">
+            {details.relatedStocks.map((stock, index) => (
+              <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded">
+                <div>
+                  <div className="font-medium">{stock.name}</div>
+                  <div className="text-sm text-gray-500">{stock.code}</div>
+                </div>
+                <div className="text-right">
+                  <div className={`font-medium ${
+                    stock.change.startsWith('+') ? 'text-red-600' : 'text-green-600'
+                  }`}>{stock.change}</div>
+                  <div className="text-xs text-gray-500">{stock.reason}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-6">
+          <div className="bg-white rounded-lg border p-4">
+            <h6 className="text-base font-semibold mb-3">交易建议</h6>
+            <ul className="list-disc pl-5 space-y-1">
+              {details.tradingSuggestions.map((item, index) => (
+                <li key={index} className="text-gray-600">{item}</li>
+              ))}
+            </ul>
+          </div>
+          <div className="bg-white rounded-lg border p-4">
+            <h6 className="text-base font-semibold mb-3">风险因素</h6>
+            <ul className="list-disc pl-5 space-y-1">
+              {details.riskFactors.map((item, index) => (
+                <li key={index} className="text-gray-600">{item}</li>
+              ))}
+            </ul>
+          </div>
         </div>
       </div>
     );
@@ -435,7 +647,13 @@ const StockFutures: React.FC = () => {
                       </thead>
                       <tbody className="bg-white divide-y divide-gray-200">
                         {signals.map((signal) => (
-                          <tr key={signal.timestamp} className="hover:bg-gray-50">
+                          <tr
+                            key={signal.timestamp}
+                            onClick={() => setSelectedSignal(signal)}
+                            className={`hover:bg-gray-50 cursor-pointer ${
+                              selectedSignal.timestamp === signal.timestamp ? 'bg-blue-50' : ''
+                            }`}
+                          >
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{signal.timestamp}</td>
                             <td className="px-6 py-4 whitespace-nowrap">
                               <span className={`
@@ -463,6 +681,10 @@ const StockFutures: React.FC = () => {
                       </tbody>
                     </table>
                   </div>
+                </div>
+
+                <div className="bg-white rounded-lg shadow p-6">
+                  <SignalDetail signal={selectedSignal} />
                 </div>
 
                 <div className="bg-white rounded-lg shadow p-6">
