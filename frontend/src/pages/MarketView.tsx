@@ -1,11 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import KLineChart from '../components/KLineChart';
-import { Card, Statistic, Row, Col, Spin } from 'antd';
+import { Card, Statistic, Row, Col, Spin, Button } from 'antd';
 import { ArrowUpOutlined, ArrowDownOutlined } from '@ant-design/icons';
 import axios from 'axios';
 import { API_BASE_URL } from '../config/api';
 import Toast from '../components/Toast';
 import Layout from '../components/layout/Layout';
+import ReactMarkdown from 'react-markdown';
 
 interface MarketData {
   price: number;
@@ -17,8 +18,22 @@ interface MarketData {
   settlement: number;
 }
 
+interface SRLevel {
+  price: number;
+  type: 'Support' | 'Resistance';
+  strength: number;
+  start_time: string;
+  break_time: string | null;
+  retest_times: string[];
+  timeframe: string;
+}
+
 const MarketView: React.FC = () => {
   const [loading, setLoading] = useState(false);
+  const [strategy, setStrategy] = useState<string>('');
+  const [streamingStrategy, setStreamingStrategy] = useState<string>('');
+  const chartRef = useRef<any>(null);
+  const eventSourceRef = useRef<EventSource | null>(null);
   const [marketData, setMarketData] = useState<MarketData>({
     price: 0,
     change: 0,
@@ -94,15 +109,30 @@ const MarketView: React.FC = () => {
     };
   }, []);
 
+  // 清理函数
+  const cleanupEventSource = () => {
+    if (eventSourceRef.current) {
+      eventSourceRef.current.close();
+      eventSourceRef.current = null;
+    }
+  };
+
+  // 组件卸载时清理
+  useEffect(() => {
+    return () => {
+      cleanupEventSource();
+    };
+  }, []);
+
   return (
     <Layout>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="text-center mb-12">
           <h1 className="text-3xl font-bold text-gray-900 sm:text-4xl">
-            实时行情
+            操盘
           </h1>
           <p className="mt-3 max-w-2xl mx-auto text-xl text-gray-500 sm:mt-4">
-            豆粕期货主力合约实时行情监控，提供K线图表与核心指标分析
+            豆粕期货主力合约行情监控，提供K线图表与支撑阻力位分析
           </p>
         </div>
 
@@ -157,14 +187,119 @@ const MarketView: React.FC = () => {
 
         <div className="bg-white rounded-lg">
           <div className="flex justify-between items-center mb-6">
-            <h1 className="text-2xl font-bold">豆粕主力实时行情</h1>
+            <h1 className="text-2xl font-bold">豆粕2509合约行情</h1>
             <div className="flex items-center">
               {loading && <Spin className="mr-4" />}
             </div>
           </div>
           <div>
-            <KLineChart />
+            <KLineChart ref={chartRef} />
           </div>
+        </div>
+        <div className="bg-white rounded-lg mt-6">
+          <div className="flex justify-between items-center mb-6">
+            <h1 className="text-2xl font-bold">操盘策略（DeepSeek提示）</h1>
+            <div className="flex items-center">
+              {loading && <Spin className="mr-4" />}
+              <Button 
+                type="primary" 
+                onClick={async () => {
+                  try {
+                    setLoading(true);
+                    setStreamingStrategy(''); // 清空之前的内容
+                    setStrategy(''); // 清空之前的完整内容
+                    
+                    // 清理之前的 EventSource
+                    cleanupEventSource();
+
+                    // 获取当前K线图的sr_levels数据
+                    const chartInstance = chartRef.current?.getEchartsInstance();
+                    const option = chartInstance?.getOption();
+                    const markLines = option?.series[0]?.markLine?.data || [];
+                    
+                    // 转换为后端需要的格式
+                    const sr_levels = markLines.map((line: any) => ({
+                      price: Number(line[0].coord[1]),
+                      type: line[0].name === 'Support' ? 'Support' : 'Resistance',
+                      strength: Number(line[0].lineStyle.width),
+                      start_time: option.xAxis[0].data[line[0].coord[0]],
+                      break_time: line[1].coord ? option.xAxis[0].data[line[1].coord[0]] : null,
+                      retest_times: [],
+                      timeframe: '30m'
+                    }));
+
+                    // 发送 POST 请求并处理流式响应
+                    const response = await fetch(`${API_BASE_URL}/market/strategy`, {
+                      method: 'POST',
+                      headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'text/event-stream',
+                      },
+                      body: JSON.stringify({ sr_levels }),
+                    });
+
+                    if (!response.ok) {
+                      throw new Error('Strategy request failed');
+                    }
+
+                    // 创建响应流读取器
+                    const reader = response.body?.getReader();
+                    const decoder = new TextDecoder();
+
+                    if (!reader) {
+                      throw new Error('Failed to create stream reader');
+                    }
+
+                    // 读取流数据
+                    while (true) {
+                      const { done, value } = await reader.read();
+                      if (done) {
+                        setLoading(false);
+                        break;
+                      }
+
+                      // 解码并处理数据
+                      const text = decoder.decode(value);
+                      const lines = text.split('\n');
+                      
+                      for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                          try {
+                            const data = JSON.parse(line.slice(6));
+                            if (data.type === 'content') {
+                              setStreamingStrategy(prev => prev + data.content);
+                            } else if (data.type === 'done') {
+                              setStrategy(data.content);
+                              setLoading(false);
+                              reader.cancel();
+                              break;
+                            }
+                          } catch (error) {
+                            console.error('Error parsing SSE data:', error);
+                          }
+                        }
+                      }
+                    }
+
+                  } catch (error) {
+                    console.error('获取策略失败:', error);
+                    setToast({
+                      message: '获取策略失败，请稍后重试',
+                      type: 'error'
+                    });
+                    setLoading(false);
+                  }
+                }}
+              >
+                立即获取
+              </Button>
+            </div>
+          </div>
+          {(streamingStrategy || strategy) && (
+            <div className="strategy-content p-4 whitespace-pre-wrap">
+              <ReactMarkdown>{streamingStrategy || strategy}</ReactMarkdown>
+            </div>
+          )}
         </div>
 
         {toast && (

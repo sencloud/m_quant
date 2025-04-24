@@ -1,5 +1,6 @@
-from fastapi import APIRouter, HTTPException, Depends, Query
-from typing import List, Optional
+import json
+from fastapi import APIRouter, HTTPException, Depends, Query, Request, Body
+from typing import List, Optional, Dict
 from services.market_data import MarketDataService
 from services.opt_service import OptService
 from models.market_data import FuturesData, ETFData, OptionsData, InventoryData, TechnicalIndicators, OptionsHedgeData, OptionBasic, OptionDaily, CostComparisonData, PriceRangeAnalysis
@@ -9,9 +10,20 @@ import pandas as pd
 import numpy as np
 from pathlib import Path
 from services.support_resistance import SupportResistanceService
+from fastapi.responses import StreamingResponse
 import akshare as ak
+from openai import OpenAI
+from config import settings
+from starlette.background import BackgroundTask
+from pydantic import BaseModel
 
 router = APIRouter()
+
+# 初始化OpenAI客户端
+client = OpenAI(
+    api_key=settings.DEEPSEEK_API_KEY,
+    base_url="https://ark.cn-beijing.volces.com/api/v3/bots"
+)
 
 def get_market_data_service() -> MarketDataService:
     logger.debug("创建市场数据服务实例")
@@ -514,3 +526,89 @@ async def get_realtime_data():
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e)) 
+    
+async def stream_response(response, request: Request, next_day: str):
+    last_content = ""
+    
+    try:
+        for chunk in response:
+            # 检查客户端是否断开连接
+            if await request.is_disconnected():
+                logger.info("客户端断开连接")
+                break
+                
+            try:
+                if hasattr(chunk, "references"):
+                    pass
+                if not chunk.choices:
+                    continue
+                if chunk.choices[0].delta.content:
+                    new_content = chunk.choices[0].delta.content
+                    yield f"data: {json.dumps({'type': 'content', 'content': new_content})}\n\n"
+                    last_content += new_content
+                    
+            except Exception as e:
+                logger.error(f"处理chunk时出错: {str(e)}")
+                continue
+        
+        # 发送完成标记
+        yield f"data: {json.dumps({'type': 'done', 'content': last_content})}\n\n"
+        
+    except Exception as e:
+        logger.error(f"流式响应出错: {str(e)}", exc_info=True)
+        yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
+    finally:
+        logger.info("流式响应结束")
+
+class SRLevel(BaseModel):
+    price: float
+    type: str
+    strength: float
+    start_time: str
+    break_time: Optional[str]
+    retest_times: List[str]
+    timeframe: str
+
+class StrategyRequest(BaseModel):
+    sr_levels: List[SRLevel]
+
+@router.post("/strategy")
+async def get_strategy(
+    request: Request,
+    strategy_request: StrategyRequest = Body(...),
+):
+    """获取操盘策略"""
+    try:
+        logger.info("开始调用Deepseek API")
+        
+        prompt = f"""目标：基于豆粕2509合约行情数据分析得到的支撑阻力位数据分析给出操作策略，不要出现任何的引用和来源。
+                支撑阻力位数据：
+                {strategy_request.sr_levels}
+                """
+
+        logger.info(f"提示词：{prompt}")
+        try:
+            response = client.chat.completions.create(
+                model="bot-20250329163710-8zcqm",
+                messages=[
+                    {"role": "system", "content": "你是一个豆粕期货量化策略专家，请根据我给你的豆粕2509合约行情数据分析得到的支撑阻力位数据，分析给出操作建议。"},
+                    {"role": "user", "content": prompt}
+                ],
+                stream=True
+            )
+
+            return StreamingResponse(
+                stream_response(response, request, ""),
+                media_type="text/event-stream",
+                background=BackgroundTask(logger.info, "请求处理完成")
+            )
+            
+        except Exception as e:
+            logger.error(f"API调用失败: {str(e)}", exc_info=True)
+            raise HTTPException(status_code=500, detail=f"API调用失败: {str(e)}")
+            
+    except Exception as e:
+        logger.error(f"获取操盘策略失败: {str(e)}", exc_info=True)
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))

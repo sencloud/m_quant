@@ -27,10 +27,19 @@ interface SRLevel {
 interface KLineChartProps {
 }
 
-const KLineChart: React.FC<KLineChartProps> = () => {
+const KLineChart = React.forwardRef<any, KLineChartProps>((props, ref) => {
   const chartRef = useRef<HTMLDivElement>(null);
   const chartInstance = useRef<echarts.ECharts | null>(null);
   const [period, setPeriod] = React.useState('30');
+
+  // 在组件挂载时将echarts实例暴露给父组件
+  useEffect(() => {
+    if (ref && 'current' in ref) {
+      ref.current = {
+        getEchartsInstance: () => chartInstance.current
+      };
+    }
+  }, [ref]);
 
   // 更新最高最低点标记
   const updateMarkPoints = () => {
@@ -537,6 +546,6 @@ const KLineChart: React.FC<KLineChartProps> = () => {
       <div ref={chartRef} style={{ width: '100%', height: '600px' }} />
     </div>
   );
-};
+});
 
 export default KLineChart; 
