@@ -3,6 +3,7 @@ import ReactECharts from 'echarts-for-react';
 import { CompanyInfo, StockFuturesData, TradingSignal } from '../../types/stockFutures';
 import Layout from '../../components/layout/Layout';
 import type { EChartsOption } from 'echarts';
+import { API_ENDPOINTS } from '../../config/api';
 
 const COMPANIES: CompanyInfo[] = [
   { code: '300999.SZ', name: '金龙鱼', type: 'upstream', description: '大豆压榨及食用油生产' },
@@ -229,6 +230,33 @@ const StockFutures: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [selectedCompany, setSelectedCompany] = useState<CompanyInfo>(COMPANIES[0]);
   const [selectedSignal, setSelectedSignal] = useState<TradingSignal>(MOCK_SIGNALS[0]);
+  const [stockPickingResults, setStockPickingResults] = useState<any>(null);
+  const [stockPickingLoading, setStockPickingLoading] = useState(false);
+
+  const handleStockPicking = async () => {
+    try {
+      setStockPickingLoading(true);
+      const response = await fetch(API_ENDPOINTS.stockFutures.stockPicking, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ limit: 10 })  // 设置返回10只股票
+      });
+      
+      if (!response.ok) {
+        throw new Error('选股请求失败');
+      }
+      
+      const data = await response.json();
+      setStockPickingResults(data);
+    } catch (error) {
+      console.error('选股失败:', error);
+      // 可以添加一个toast提示
+    } finally {
+      setStockPickingLoading(false);
+    }
+  };
 
   const getKLineOption = (data: any[]): EChartsOption => ({
     tooltip: {
@@ -563,6 +591,22 @@ const StockFutures: React.FC = () => {
                   联动信号
                 </span>
               </button>
+              <button
+                onClick={() => setActiveTab('stockPick')}
+                className={`
+                  py-4 px-1 border-b-2 font-medium text-sm
+                  ${activeTab === 'stockPick'
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}
+                `}
+              >
+                <span className="flex items-center">
+                  <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16l2.879-2.879m0 0a3 3 0 104.243-4.242 3 3 0 00-4.243 4.242zM21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  智能选股
+                </span>
+              </button>
             </nav>
           </div>
 
@@ -632,7 +676,7 @@ const StockFutures: React.FC = () => {
                   <CompanyDetail company={selectedCompany} />
                 </div>
               </div>
-            ) : (
+            ) : activeTab === 'signals' ? (
               <div className="space-y-6">
                 <div className="bg-white rounded-lg shadow overflow-hidden">
                   <div className="overflow-x-auto">
@@ -690,6 +734,107 @@ const StockFutures: React.FC = () => {
                 <div className="bg-white rounded-lg shadow p-6">
                   <h3 className="text-lg font-medium text-gray-900 mb-4">期现价差</h3>
                   <ReactECharts option={getBasicOption()} style={{ height: '400px' }} />
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-6">
+                <div className="bg-white rounded-lg shadow p-6 text-center">
+                  <h3 className="text-xl font-bold text-gray-900 mb-4">智能选股</h3>
+                  <p className="text-gray-600 mb-6">基于豆粕期货价格变动、基差走势、产业链利润等多维度指标，智能筛选高潜力标的</p>
+                  <button 
+                    onClick={handleStockPicking}
+                    disabled={stockPickingLoading}
+                    className={`
+                      bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-lg shadow-lg 
+                      transform transition duration-200 hover:scale-105
+                      ${stockPickingLoading ? 'opacity-50 cursor-not-allowed' : ''}
+                    `}
+                  >
+                    {stockPickingLoading ? '选股中...' : '立即选股'}
+                  </button>
+                </div>
+
+                <div className="bg-white rounded-lg shadow overflow-hidden">
+                  <div className="p-6 border-b">
+                    <h4 className="text-lg font-semibold">选股结果</h4>
+                    <p className="text-sm text-gray-500 mt-1">
+                      最后更新时间：{stockPickingResults?.timestamp || '暂无数据'}
+                    </p>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">推荐级别</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">股票代码</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">股票名称</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">最新价</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">涨跌幅</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">推荐理由</th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {stockPickingResults?.recommendations?.map((stock: any) => (
+                          <tr key={stock.code}>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <span className={`
+                                px-2 py-1 rounded-full text-xs font-medium
+                                ${stock.level === '强烈推荐' ? 'bg-red-100 text-red-800' : 'bg-orange-100 text-orange-800'}
+                              `}>
+                                {stock.level}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{stock.code}</td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{stock.name}</td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{stock.price}</td>
+                            <td className={`px-6 py-4 whitespace-nowrap text-sm ${
+                              stock.change_pct >= 0 ? 'text-red-600' : 'text-green-600'
+                            }`}>
+                              {stock.change_pct >= 0 ? '+' : ''}{stock.change_pct}%
+                            </td>
+                            <td className="px-6 py-4 text-sm text-gray-500">{stock.reason}</td>
+                          </tr>
+                        ))}
+                        {!stockPickingResults?.recommendations && (
+                          <tr>
+                            <td colSpan={6} className="px-6 py-4 text-center text-gray-500">
+                              点击"立即选股"获取推荐结果
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                <div className="bg-white rounded-lg shadow p-6">
+                  <h4 className="text-lg font-semibold mb-4">选股策略说明</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div className="bg-gray-50 p-4 rounded-lg">
+                      <h5 className="font-medium text-gray-900">基础面筛选</h5>
+                      <ul className="mt-2 space-y-2 text-sm text-gray-600">
+                        <li>• PE、PB低于行业均值</li>
+                        <li>• 营收增速 {'>'} 15%</li>
+                        <li>• 净利润增速 {'>'} 10%</li>
+                      </ul>
+                    </div>
+                    <div className="bg-gray-50 p-4 rounded-lg">
+                      <h5 className="font-medium text-gray-900">技术面筛选</h5>
+                      <ul className="mt-2 space-y-2 text-sm text-gray-600">
+                        <li>• MACD金叉</li>
+                        <li>• 量价配合</li>
+                        <li>• 股价位于支撑位</li>
+                      </ul>
+                    </div>
+                    <div className="bg-gray-50 p-4 rounded-lg">
+                      <h5 className="font-medium text-gray-900">产业链分析</h5>
+                      <ul className="mt-2 space-y-2 text-sm text-gray-600">
+                        <li>• 基差走势</li>
+                        <li>• 库存水平</li>
+                        <li>• 产业链利润</li>
+                      </ul>
+                    </div>
+                  </div>
                 </div>
               </div>
             )}

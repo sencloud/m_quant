@@ -60,5 +60,8 @@ export const API_ENDPOINTS = {
   supportResistance: {
     data: `${API_BASE_URL}/support_resistance/data`,
     backtest: `${API_BASE_URL}/support_resistance/backtest`
+  },
+  stockFutures: {
+    stockPicking: `${API_BASE_URL}/stockfutures/stock-picking`
   }
 }; 
