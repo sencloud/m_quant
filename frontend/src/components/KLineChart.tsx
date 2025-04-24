@@ -13,10 +13,107 @@ interface KLineData {
   volume: number;
 }
 
-const KLineChart: React.FC = () => {
+interface KLineChartProps {
+}
+
+const KLineChart: React.FC<KLineChartProps> = () => {
   const chartRef = useRef<HTMLDivElement>(null);
   const chartInstance = useRef<echarts.ECharts | null>(null);
   const [period, setPeriod] = React.useState('30');
+
+  // 更新最高最低点标记
+  const updateMarkPoints = () => {
+    if (!chartInstance.current) return;
+    
+    const option = chartInstance.current.getOption();
+    const klineData = (option.series as any)[0].data as number[][];
+    if (!klineData || !klineData.length) return;
+
+    // 获取当前可视区域的数据
+    const dataZoom = (option.dataZoom as any)[0];
+    const start = Math.floor(klineData.length * dataZoom.start / 100);
+    const end = Math.ceil(klineData.length * dataZoom.end / 100);
+    const visibleData = klineData.slice(start, end);
+
+    // 计算最高最低点
+    interface MarkPoint {
+      value: number;
+      coord: [number, number];
+      symbol: string;
+      symbolSize: number;
+      itemStyle: { color: string };
+    }
+    
+    const highPoints: MarkPoint[] = [];
+    const lowPoints: MarkPoint[] = [];
+    
+    visibleData.forEach((item: number[], index: number) => {
+      const high = item[3];  // 最高价
+      const low = item[2];   // 最低价
+      
+      // 将当前点与前后的点比较，找出局部最高最低点
+      const prev = visibleData[index - 1];
+      const next = visibleData[index + 1];
+      
+      if ((!prev || high >= prev[3]) && (!next || high >= next[3])) {
+        highPoints.push({
+          value: high,
+          coord: [start + index, high],
+          symbol: 'circle',
+          symbolSize: 8,
+          itemStyle: { color: '#ef232a' }
+        });
+      }
+      
+      if ((!prev || low <= prev[2]) && (!next || low <= next[2])) {
+        lowPoints.push({
+          value: low,
+          coord: [start + index, low],
+          symbol: 'circle',
+          symbolSize: 8,
+          itemStyle: { color: '#14b143' }
+        });
+      }
+    });
+
+    // 按价格排序并只取前三个
+    highPoints.sort((a, b) => b.value - a.value);
+    lowPoints.sort((a, b) => a.value - b.value);
+
+    // 过滤掉相邻的价差小于10的点
+    const filteredHighPoints = highPoints.reduce((acc: MarkPoint[], curr) => {
+      if (acc.length === 0 || Math.abs(acc[acc.length - 1].value - curr.value) >= 10) {
+        acc.push(curr);
+      }
+      return acc;
+    }, []).slice(0, 3);
+
+    const filteredLowPoints = lowPoints.reduce((acc: MarkPoint[], curr) => {
+      if (acc.length === 0 || Math.abs(acc[acc.length - 1].value - curr.value) >= 10) {
+        acc.push(curr);
+      }
+      return acc;
+    }, []).slice(0, 3);
+
+    chartInstance.current.setOption({
+      series: [{
+        markPoint: {
+          data: [...filteredHighPoints, ...filteredLowPoints]
+        }
+      }]
+    });
+  };
+
+  // 计算初始展示位置
+  const calculateInitialRange = (dataLength: number) => {
+    if (dataLength <= 100) {
+      return { start: 0, end: 100 };
+    }
+    return {
+      start: Math.max(0, ((dataLength - 100) / dataLength) * 100),
+      end: 100
+    };
+  };
 
   const fetchData = async () => {
     try {
@@ -40,16 +137,39 @@ const KLineChart: React.FC = () => {
           }
         }));
 
+        const { start, end } = calculateInitialRange(dates.length);
+
         chartInstance.current.setOption({
           xAxis: [{
             data: dates
           }, {
             data: dates
           }],
+          dataZoom: [{
+            start: start,
+            end: end
+          }, {
+            start: start,
+            end: end
+          }],
           series: [{
             name: '豆粕主力',
             type: 'candlestick',
-            data: klineData
+            data: klineData,
+            itemStyle: {
+              color: '#ef232a',
+              color0: '#14b143',
+              borderColor: '#ef232a',
+              borderColor0: '#14b143'
+            },
+            markPoint: {
+              data: [],
+              label: {
+                formatter: function(param: any) {
+                  return param.value.toFixed(0);
+                }
+              }
+            }
           }, {
             name: 'Volume',
             type: 'bar',
@@ -58,6 +178,11 @@ const KLineChart: React.FC = () => {
             data: volumes
           }]
         });
+
+        // 初始化后立即更新最高最低点标记
+        setTimeout(() => {
+          updateMarkPoints();
+        }, 0);
       }
     } catch (error) {
       console.error('获取K线数据失败:', error);
@@ -75,6 +200,32 @@ const KLineChart: React.FC = () => {
           left: 'center',
           data: ['豆粕主力']
         },
+        toolbox: {
+          right: '5%',
+          top: '5%',
+          feature: {
+            dataZoom: {
+              yAxisIndex: 'none',
+              title: {
+                zoom: '区域缩放',
+                back: '区域缩放还原'
+              }
+            },
+            restore: {
+              title: '还原'
+            },
+            saveAsImage: {
+              title: '保存为图片'
+            },
+            fullScreen: {
+              show: true,
+              title: {
+                fullScreen: '全屏',
+                cancelFullScreen: '退出全屏'
+              }
+            }
+          }
+        },
         tooltip: {
           trigger: 'axis',
           axisPointer: {
@@ -86,26 +237,27 @@ const KLineChart: React.FC = () => {
               return [
                 '时间: ' + kline.axisValue + '<br/>',
                 '开: ' + kline.data[1] + '<br/>',
-                '收: ' + kline.data[2] + '<br/>',
+                '高: ' + kline.data[4] + '<br/>',
                 '低: ' + kline.data[3] + '<br/>',
-                '高: ' + kline.data[4]
+                '收: ' + kline.data[2]
               ].join('');
             } else {
-              return '成交量: ' + params[0].data;
+              return '成交量: ' + params[0].data.value;
             }
           }
         },
         grid: [
           {
-            left: '10%',
-            right: '8%',
+            left: '5%',
+            right: '5%',
+            top: '5%',
             height: '60%'
           },
           {
-            left: '10%',
-            right: '8%',
-            top: '75%',
-            height: '15%'
+            left: '5%',
+            right: '5%',
+            top: '70%',
+            height: '20%'
           }
         ],
         xAxis: [
@@ -116,7 +268,9 @@ const KLineChart: React.FC = () => {
             boundaryGap: false,
             axisLine: { onZero: false },
             splitLine: { show: false },
-            splitNumber: 20
+            splitNumber: 20,
+            min: 'dataMin',
+            max: 'dataMax'
           },
           {
             type: 'category',
@@ -128,7 +282,9 @@ const KLineChart: React.FC = () => {
             axisTick: { show: false },
             splitLine: { show: false },
             axisLabel: { show: false },
-            splitNumber: 20
+            splitNumber: 20,
+            min: 'dataMin',
+            max: 'dataMax'
           }
         ],
         yAxis: [
@@ -159,7 +315,7 @@ const KLineChart: React.FC = () => {
             show: true,
             xAxisIndex: [0, 1],
             type: 'slider',
-            top: '85%',
+            top: '92%',
             start: 50,
             end: 100
           }
@@ -174,6 +330,14 @@ const KLineChart: React.FC = () => {
               color0: '#14b143',
               borderColor: '#ef232a',
               borderColor0: '#14b143'
+            },
+            markPoint: {
+              data: [],
+              label: {
+                formatter: function(param: any) {
+                  return param.value.toFixed(0);
+                }
+              }
             }
           },
           {
@@ -181,10 +345,7 @@ const KLineChart: React.FC = () => {
             type: 'bar',
             xAxisIndex: 1,
             yAxisIndex: 1,
-            data: [],
-            itemStyle: {
-              color: '#7fbe9e'
-            }
+            data: []
           }
         ]
       };
@@ -194,6 +355,11 @@ const KLineChart: React.FC = () => {
 
     // 初始加载数据
     fetchData();
+
+    // 监听缩放事件
+    if (chartInstance.current) {
+      chartInstance.current.on('dataZoom', updateMarkPoints);
+    }
 
     // 判断当前是否为交易时间
     const isTradeTime = () => {
@@ -244,16 +410,18 @@ const KLineChart: React.FC = () => {
   };
 
   return (
-    <div className="w-full h-full flex flex-col">
+    <div>
       <div className="mb-4">
         <Radio.Group value={period} onChange={handlePeriodChange}>
+          <Radio.Button value="1">1分钟</Radio.Button>
+          <Radio.Button value="5">5分钟</Radio.Button>
           <Radio.Button value="15">15分钟</Radio.Button>
           <Radio.Button value="30">30分钟</Radio.Button>
           <Radio.Button value="60">1小时</Radio.Button>
-          <Radio.Button value="d">日线</Radio.Button>
+          <Radio.Button value="D">日线</Radio.Button>
         </Radio.Group>
       </div>
-      <div ref={chartRef} className="flex-1" style={{ minHeight: '600px' }} />
+      <div ref={chartRef} style={{ width: '100%', height: '600px' }} />
     </div>
   );
 };

@@ -158,9 +158,13 @@ const MarketView: React.FC = () => {
         <div className="bg-white rounded-lg">
           <div className="flex justify-between items-center mb-6">
             <h1 className="text-2xl font-bold">豆粕主力实时行情</h1>
-            {loading && <Spin />}
+            <div className="flex items-center">
+              {loading && <Spin className="mr-4" />}
+            </div>
           </div>
-          <KLineChart />
+          <div>
+            <KLineChart />
+          </div>
         </div>
 
         {toast && (
