@@ -11,6 +11,17 @@ interface KLineData {
   low: number;
   close: number;
   volume: number;
+  open_interest: number;
+}
+
+interface SRLevel {
+  price: number;
+  type: 'Support' | 'Resistance';
+  strength: number;
+  start_time: string;
+  break_time: string | null;
+  retest_times: string[];
+  timeframe: string;
 }
 
 interface KLineChartProps {
@@ -118,7 +129,7 @@ const KLineChart: React.FC<KLineChartProps> = () => {
   const fetchData = async () => {
     try {
       const response = await axios.get(API_ENDPOINTS.market.kline(period));
-      const data = response.data;
+      const { kline_data: data, sr_levels } = response.data;
       
       // 更新图表
       if (chartInstance.current) {
@@ -129,13 +140,114 @@ const KLineChart: React.FC<KLineChartProps> = () => {
           Number(item.low),
           Number(item.high)
         ]);
-        // 根据开盘收盘价判断涨跌，设置成交量颜色
+        
+        // 成交量数据
         const volumes = data.map((item: KLineData) => ({
           value: Number(item.volume),
           itemStyle: {
             color: Number(item.close) >= Number(item.open) ? '#ef232a' : '#14b143'
           }
         }));
+
+        // 生成支撑位和阻力位的标记线数据
+        const formattedMarkLines = [];
+
+        // 调试日志
+        console.log('K线时间序列:', dates);
+        console.log('支撑阻力位数据:', sr_levels);
+
+        // 处理支撑位和阻力位
+        for (const level of sr_levels) {
+          // 确保日期格式匹配
+          const startIndex = dates.findIndex((date: string) => {
+            const klineDate = new Date(date).getTime();
+            const levelDate = new Date(level.start_time).getTime();
+            return klineDate === levelDate;
+          });
+
+          const endIndex = level.break_time 
+            ? dates.findIndex((date: string) => {
+                const klineDate = new Date(date).getTime();
+                const levelDate = new Date(level.break_time!).getTime();
+                return klineDate === levelDate;
+              })
+            : dates.length - 1;
+
+          // 调试日志
+          console.log(`支撑阻力位 ${level.price} (${level.type}):`, {
+            startTime: level.start_time,
+            breakTime: level.break_time,
+            startIndex,
+            endIndex
+          });
+
+          if (startIndex === -1) continue;
+
+          const lineColor = level.type === 'Support' ? '#14b143' : '#ef232a';
+          const lineWidth = level.strength; // 使用强度作为线宽
+
+          formattedMarkLines.push([{
+            name: level.type,
+            coord: [startIndex, level.price],
+            lineStyle: {
+              color: lineColor,
+              type: 'dashed',
+              width: lineWidth
+            },
+            label: {
+              show: true,
+              position: 'middle',
+              formatter: level.price.toFixed(0),
+              color: lineColor,
+              fontSize: 11,
+              backgroundColor: level.type === 'Support' 
+                ? 'rgba(20, 177, 67, 0.1)' 
+                : 'rgba(239, 35, 42, 0.1)',
+              padding: [2, 4]
+            }
+          }, {
+            coord: [endIndex, level.price]
+          }]);
+
+          // 如果有重测时间点，添加重测标记
+          level.retest_times.forEach((retestTime: string) => {
+            const retestIndex = dates.findIndex((date: string) => {
+              const klineDate = new Date(date).getTime();
+              const levelDate = new Date(retestTime).getTime();
+              return klineDate === levelDate;
+            });
+
+            if (retestIndex !== -1) {
+              formattedMarkLines.push([{
+                name: `${level.type === 'Support' ? '支撑位测试' : '阻力位测试'}`,
+                coord: [retestIndex, level.price],
+                symbol: 'circle',
+                symbolSize: 5,
+                lineStyle: {
+                  color: lineColor,
+                  type: 'dashed',
+                  width: 1
+                },
+                label: {
+                  show: true,
+                  position: 'middle',
+                  formatter: `${level.type === 'Support' ? '支撑位测试' : '阻力位测试'}`,
+                  color: lineColor,
+                  fontSize: 10,
+                  backgroundColor: level.type === 'Support' 
+                    ? 'rgba(20, 177, 67, 0.1)' 
+                    : 'rgba(239, 35, 42, 0.1)',
+                  padding: [2, 4]
+                }
+              }, {
+                coord: [retestIndex + 1, level.price]
+              }]);
+            }
+          });
+        }
+
+        // 调试日志
+        console.log('格式化后的标记线数据:', formattedMarkLines);
 
         const { start, end } = calculateInitialRange(dates.length);
 
@@ -162,11 +274,13 @@ const KLineChart: React.FC<KLineChartProps> = () => {
               borderColor: '#ef232a',
               borderColor0: '#14b143'
             },
-            markPoint: {
-              data: [],
-              label: {
-                formatter: function(param: any) {
-                  return param.value.toFixed(0);
+            markLine: {
+              symbol: ['none', 'none'],
+              data: formattedMarkLines,
+              animation: false,
+              emphasis: {
+                lineStyle: {
+                  width: 2
                 }
               }
             }
@@ -335,7 +449,7 @@ const KLineChart: React.FC<KLineChartProps> = () => {
               data: [],
               label: {
                 formatter: function(param: any) {
-                  return param.value.toFixed(0);
+                  return typeof param.value === 'number' ? param.value.toFixed(0) : param.value;
                 }
               }
             }
@@ -389,13 +503,12 @@ const KLineChart: React.FC<KLineChartProps> = () => {
         return false;
     };
 
-    // 设置定时器,每30秒更新一次数据
-    // 只在交易时间内每3秒刷新一次数据
+    // 只在交易时间内每10秒刷新一次数据
     const timer = setInterval(() => {
         if (isTradeTime()) {
             fetchData();
         }
-      }, 3000);
+      }, 10000);
 
     return () => {
       clearInterval(timer);

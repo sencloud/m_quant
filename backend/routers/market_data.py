@@ -461,12 +461,27 @@ async def get_kline_data(period: str):
                 'datetime': 'date',
                 'hold': 'open_interest'
             })
+
+        # 确保数据按时间排序
+        df = df.sort_values('date')
+        df = df.reset_index(drop=True)
+
+        # 使用SupportResistanceService计算支撑位和阻力位
+        sr_service = SupportResistanceService()
+        sr_levels = sr_service.get_sr_levels(df, period)
             
-        # 转换为字典列表返回
-        result = df.to_dict(orient='records')
-        return result
+        # 转换为字典列表
+        market_data = df.to_dict(orient='records')
+
+        # 返回K线数据和支撑阻力位数据
+        return {
+            "kline_data": market_data,
+            "sr_levels": sr_levels
+        }
         
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/realtime")
