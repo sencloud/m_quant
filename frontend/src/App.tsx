@@ -16,6 +16,7 @@ import Disclaimer from './pages/Disclaimer';
 import Signals from './pages/Signals';
 import MultiVarietyArbitrage from './pages/MultiVarietyArbitrage';
 import StockFutures from './pages/pro/StockFutures';
+import SoybeanImport from './pages/pro/SoybeanImport';
 
 const queryClient = new QueryClient();
 
@@ -33,6 +34,7 @@ const App: React.FC = () => {
           <Route path="/research/options-strategy" element={<OptionsStrategyPage />} />
           <Route path="/pro-analysis" element={<ProAnalysis />} />
           <Route path="/pro/stock-futures" element={<StockFutures />} />
+          <Route path="/pro/soybean-import" element={<SoybeanImport />} />
           <Route path="/news-analysis" element={<NewsAnalysis />} />
           <Route path="/agents" element={<Agents />} />
           <Route path="/multi-variety-arbitrage" element={<MultiVarietyArbitrage />} />

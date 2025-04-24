@@ -53,6 +53,18 @@ const Header: React.FC = () => {
       ),
     },
     {
+      key: 'soybean-import',
+      label: (
+        <Link to="/pro/soybean-import" className="flex items-center py-2 px-4 hover:bg-gray-50">
+          <BarChartOutlined className="mr-3 text-blue-500 text-xl" />
+          <div>
+            <div className="font-medium">大豆进口分析</div>
+            <div className="text-xs text-gray-500">进口数据深度分析与预测</div>
+          </div>
+        </Link>
+      ),
+    },
+    {
       key: 'news-analysis',
       label: (
         <Link to="/news-analysis" className="flex items-center py-2 px-4 hover:bg-gray-50">

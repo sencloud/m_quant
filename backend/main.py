@@ -6,7 +6,7 @@ import os
 # 添加项目根目录到Python路径
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-from routers import market_data, trading, fundamental, core_factor, arbitrage, trend_follow, dual_ma, obv_adx_ema, news, ai, signals, account, grid, support_resistance
+from routers import market_data, trading, fundamental, core_factor, arbitrage, trend_follow, dual_ma, obv_adx_ema, news, ai, signals, account, grid, support_resistance, soybean
 from config import settings
 from utils.logger import logger
 
@@ -123,6 +123,13 @@ app.include_router(
     tags=["account"]
 )
 logger.info("账户路由注册完成")
+
+app.include_router(
+    soybean.router,
+    prefix=f"{settings.API_V1_STR}/soybean",
+    tags=["soybean"]
+)
+logger.info("大豆进口分析路由注册完成")
 
 @app.on_event("startup")
 async def startup_event():
