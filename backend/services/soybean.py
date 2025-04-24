@@ -45,8 +45,8 @@ class SoybeanService:
             
             # 获取最新数据
             current_data = db.query(SoybeanImportDB).order_by(SoybeanImportDB.date.desc()).first()
-            print(current_data.date)
             if not current_data:
+                logger.warning("未找到大豆进口数据")
                 return SoybeanImport(
                     date=datetime.now().strftime("%Y-%m-%d"),
                     current_shipment=0.0,
@@ -60,17 +60,56 @@ class SoybeanService:
                     customs_details=[]
                 )
             
+            # 获取当年所有月份数据
+            current_year = current_data.date.year
+            year_start = datetime(current_year, 1, 1).date()
+            year_end = datetime(current_year, 12, 31).date()
+            year_data = db.query(SoybeanImportDB).filter(
+                SoybeanImportDB.date >= year_start,
+                SoybeanImportDB.date <= year_end
+            ).order_by(SoybeanImportDB.date.asc()).all()
+            
             # 获取去年同期数据
+            last_year_date = current_data.date - timedelta(days=365)
             prev_year_data = db.query(SoybeanImportDB).filter(
-                SoybeanImportDB.date == current_data.date - timedelta(days=365)
+                SoybeanImportDB.date >= last_year_date,
+                SoybeanImportDB.date < last_year_date + timedelta(days=7)
             ).first()
-            print(prev_year_data.date)
             
             # 获取上月数据
+            last_month_date = current_data.date - timedelta(days=30)
             prev_month_data = db.query(SoybeanImportDB).filter(
-                SoybeanImportDB.date < current_data.date
-            ).order_by(SoybeanImportDB.date.desc()).first()
-            print(prev_month_data.date)
+                SoybeanImportDB.date >= last_month_date,
+                SoybeanImportDB.date < last_month_date + timedelta(days=7)
+            ).first()
+            
+            # 构建月度对比数据
+            monthly_comparison = []
+            for data in year_data:
+                # 实际装船量
+                monthly_comparison.append(
+                    ComparisonData(
+                        month=data.date.strftime('%Y-%m'),
+                        value=data.current_shipment,
+                        type="actual"
+                    )
+                )
+                # 预测装船量
+                monthly_comparison.append(
+                    ComparisonData(
+                        month=data.date.strftime('%Y-%m'),
+                        value=data.forecast_shipment,
+                        type="forecast"
+                    )
+                )
+                # 实际到港量
+                monthly_comparison.append(
+                    ComparisonData(
+                        month=data.date.strftime('%Y-%m'),
+                        value=data.current_arrival,
+                        type="arrival"
+                    )
+                )
             
             # 构建基础响应对象
             result = SoybeanImport(
@@ -95,23 +134,12 @@ class SoybeanService:
                 current_arrival_mom=0.0,
                 next_arrival_yoy=0.0,
                 
-                # 预期差异 - 初始化为0
-                shipment_forecast_diff=0.0,
-                arrival_forecast_diff=0.0,
+                # 预期差异
+                shipment_forecast_diff=current_data.current_shipment - current_data.forecast_shipment,
+                arrival_forecast_diff=current_data.current_month_arrival - current_data.next_arrival,
                 
                 # 图表数据
-                monthly_comparison=[
-                    ComparisonData(
-                        month=current_data.date.strftime('%Y-%m'),
-                        value=current_data.current_shipment,
-                        type="actual"
-                    ),
-                    ComparisonData(
-                        month=current_data.date.strftime('%Y-%m'),
-                        value=current_data.forecast_shipment,
-                        type="forecast"
-                    )
-                ],
+                monthly_comparison=monthly_comparison,
                 port_distribution=[
                     PortDistributionData(
                         port=detail["port"],
@@ -162,10 +190,6 @@ class SoybeanService:
                     prev_month_data.current_arrival
                 )
             
-            # 计算预期差异
-            result.shipment_forecast_diff = current_data.current_shipment - current_data.forecast_shipment
-            result.arrival_forecast_diff = current_data.current_month_arrival - current_data.next_arrival
-            
             logger.info("成功获取大豆进口数据")
             return result
             
@@ -173,18 +197,7 @@ class SoybeanService:
             logger.error(f"获取大豆进口数据失败: {e}")
             import traceback
             traceback.print_exc()
-            return SoybeanImport(
-                date=datetime.now().strftime("%Y-%m-%d"),
-                current_shipment=0.0,
-                forecast_shipment=0.0,
-                forecast_next_shipment=0.0,
-                current_arrival=0.0,
-                next_arrival=0.0,
-                current_month_arrival=0.0,
-                next_month_arrival=0.0,
-                port_details=[],
-                customs_details=[]
-            )
+            raise
         finally:
             if 'db' in locals():
                 db.close() 

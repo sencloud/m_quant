@@ -160,6 +160,9 @@ const Header: React.FC = () => {
             <NavLink to="/signals" className={getNavLinkClass}>
               信号
             </NavLink>
+            <NavLink to="/market" className={getNavLinkClass}>
+              操盘
+            </NavLink>
             <NavLink to="/trading" className={getNavLinkClass}>
               策略
             </NavLink>
@@ -227,6 +230,13 @@ const Header: React.FC = () => {
             onClick={() => setIsMenuOpen(false)}
           >
             信号
+          </NavLink>
+          <NavLink
+            to="/market"
+            className={getNavLinkClass}
+            onClick={() => setIsMenuOpen(false)}
+          >
+            操盘
           </NavLink>
           <NavLink
             to="/trading"

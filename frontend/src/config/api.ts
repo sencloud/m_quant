@@ -6,6 +6,7 @@ export const API_BASE_URL = isDevelopment
 
 export const API_ENDPOINTS = {
   market: {
+    kline: (period: string) => `${API_BASE_URL}/market/kline/${period}`,
     futures: `${API_BASE_URL}/market/futures`,
     etf: `${API_BASE_URL}/market/etf`,
     options: `${API_BASE_URL}/market/options`,

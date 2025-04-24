@@ -300,6 +300,109 @@ const SoybeanImport: React.FC = () => {
     };
   };
 
+  const getShipmentArrivalOption = (data: SoybeanImportData) => {
+    // 处理月度数据，按月份分组并合并相同月份的数据
+    const monthlyData = data.monthly_comparison.reduce((acc, curr) => {
+      const key = curr.month;
+      if (!acc[key]) {
+        acc[key] = {
+          month: curr.month,
+          actual: 0,
+          forecast: 0,
+          arrival: 0
+        };
+      }
+      if (curr.type === 'actual') {
+        acc[key].actual = curr.value;
+      } else if (curr.type === 'forecast') {
+        acc[key].forecast = curr.value;
+      } else if (curr.type === 'arrival') {
+        acc[key].arrival = curr.value;
+      }
+      return acc;
+    }, {} as Record<string, { month: string; actual: number; forecast: number; arrival: number }>);
+
+    // 转换为数组并按月份排序
+    const sortedData = Object.values(monthlyData).sort((a, b) => a.month.localeCompare(b.month));
+
+    return {
+      tooltip: {
+        trigger: 'axis',
+        formatter: (params: any) => {
+          const month = params[0].name;
+          let html = `${month}<br/>`;
+          params.forEach((param: any) => {
+            const marker = param.marker;
+            const seriesName = param.seriesName;
+            const value = param.value;
+            html += `${marker}${seriesName}: ${value}万吨<br/>`;
+          });
+          return html;
+        }
+      },
+      legend: {
+        data: ['实际装船', '预测装船', '实际到港'],
+        bottom: 0
+      },
+      grid: {
+        left: '3%',
+        right: '4%',
+        bottom: '10%',
+        top: '3%',
+        containLabel: true
+      },
+      xAxis: {
+        type: 'category',
+        boundaryGap: false,
+        data: sortedData.map(item => item.month)
+      },
+      yAxis: {
+        type: 'value',
+        name: '万吨',
+        nameLocation: 'end',
+        nameGap: 10,
+        nameTextStyle: {
+          align: 'right'
+        }
+      },
+      series: [
+        {
+          name: '实际装船',
+          type: 'line',
+          symbol: 'circle',
+          symbolSize: 6,
+          data: sortedData.map(item => item.actual),
+          itemStyle: {
+            color: '#1890ff'
+          }
+        },
+        {
+          name: '预测装船',
+          type: 'line',
+          symbol: 'circle',
+          symbolSize: 6,
+          data: sortedData.map(item => item.forecast),
+          itemStyle: {
+            color: '#52c41a'
+          },
+          lineStyle: {
+            type: 'dashed'
+          }
+        },
+        {
+          name: '实际到港',
+          type: 'line',
+          symbol: 'circle',
+          symbolSize: 6,
+          data: sortedData.map(item => item.arrival),
+          itemStyle: {
+            color: '#faad14'
+          }
+        }
+      ]
+    };
+  };
+
   // 辅助函数：根据数值返回颜色类名
   const getColorClass = (value: number) => {
     return value >= 0 ? 'text-red-600' : 'text-green-600';
@@ -331,6 +434,14 @@ const SoybeanImport: React.FC = () => {
             最后更新: {data?.date ? new Date(data.date).toLocaleDateString('zh-CN') : '-'}
           </p>
         </div>
+        <div className="grid grid-cols-1 gap-8 mb-8">
+          {/* 装船到港对比图表 */}
+          <div className="bg-white p-6 rounded-lg shadow">
+            <h2 className="text-xl font-semibold mb-4">装船到港对比</h2>
+            {data && <ReactECharts option={getShipmentArrivalOption(data)} style={{ height: '400px' }} />}
+          </div>
+        </div>
+
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
           {/* 月度对比图表 */}
           <div className="bg-white p-6 rounded-lg shadow">

@@ -9,6 +9,7 @@ import pandas as pd
 import numpy as np
 from pathlib import Path
 from services.support_resistance import SupportResistanceService
+import akshare as ak
 
 router = APIRouter()
 
@@ -430,4 +431,71 @@ async def get_support_resistance_data(period: str = "daily"):
         
     except Exception as e:
         logger.error(f"获取支撑阻力数据失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/kline/{period}")
+async def get_kline_data(period: str):
+    """获取豆粕主力合约K线数据
+    period: 15/30/60/d 分钟或日线
+    """
+    try:
+        # 获取主力合约代码
+        m_symbol = 'M2509'
+        
+        if period == 'd':
+            # 日线数据
+            df = ak.futures_zh_daily_sina(symbol=m_symbol)
+            # 重命名列以匹配前端期望的格式
+            df = df.rename(columns={
+                'hold': 'open_interest'
+            })
+        else:
+            # 分钟线数据 - 直接使用新浪财经分时数据接口
+            # 将前端传入的period转换为接口需要的格式
+            period_map = {"15": "15", "30": "30", "60": "60"}
+            sina_period = period_map.get(period, "5")  # 默认使用5分钟
+            
+            df = ak.futures_zh_minute_sina(symbol=m_symbol, period=sina_period)
+            # 重命名列以匹配前端期望的格式
+            df = df.rename(columns={
+                'datetime': 'date',
+                'hold': 'open_interest'
+            })
+            
+        # 转换为字典列表返回
+        result = df.to_dict(orient='records')
+        return result
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/realtime")
+async def get_realtime_data():
+    """获取豆粕主力合约实时行情数据"""
+    try:
+        # 获取实时行情
+        df = ak.futures_zh_spot(symbol='M2509', market="CF", adjust='0')
+        if df.empty:
+            raise HTTPException(status_code=404, detail="未获取到行情数据")
+            
+        # 计算涨跌幅
+        price = float(df['current_price'].iloc[0])
+        # 使用last_settle_price代替settlement
+        settlement = float(df['last_settle_price'].iloc[0])
+        change = price - settlement
+        change_percent = (change / settlement) * 100
+        
+        return {
+            "price": price,
+            "change": change,
+            "changePercent": change_percent,
+            "volume": int(df['volume'].iloc[0]),
+            "turnover": float(df.get('avg_price', 0).iloc[0]) if 'avg_price' in df.columns else 0,
+            "openInterest": int(df['hold'].iloc[0]),
+            "settlement": settlement
+        }
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e)) 
