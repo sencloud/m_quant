@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import ReactECharts from 'echarts-for-react';
 import { fetchSoybeanImportData } from '../../api/soybean';
-import type { SoybeanImportData } from '../../api/soybean';
 import Layout from '../../components/layout/Layout';
 import type { EChartsOption } from 'echarts';
 
@@ -113,44 +112,56 @@ const CUSTOMS_DETAILS: Record<string, CustomsDetailType> = {
 };
 
 interface ComparisonData {
-  type: string;
   month: string;
   value: number;
+  type: string;
 }
 
 interface PortDistributionData {
   port: string;
   value: number;
+  type: string;
 }
 
 interface PortData {
   port: string;
   current: number;
-  nextMonth: number;
-  nextTwoMonth: number;
+  next_month: number;
+  next_two_month: number;
 }
 
 interface CustomsData {
   customs: string;
   current: number;
-  nextPeriod: number;
-  nextMonth: number;
-  nextTwoMonth: number;
+  next_period: number;
+  next_month: number;
+  next_two_month: number;
 }
 
-interface SoybeanData {
-  currentShipment: number;
-  currentShipmentYoY: number;
-  forecastShipment: number;
-  forecastShipmentYoY: number;
-  currentArrival: number;
-  currentArrivalYoY: number;
-  nextArrival: number;
-  nextArrivalYoY: number;
-  monthlyComparison: ComparisonData[];
-  portDistribution: PortDistributionData[];
-  portDetails: PortData[];
-  customsDetails: CustomsData[];
+interface SoybeanImportData {
+  date: string;
+  current_shipment: number;
+  forecast_shipment: number;
+  forecast_next_shipment: number;
+  current_arrival: number;
+  next_arrival: number;
+  current_month_arrival: number;
+  next_month_arrival: number;
+  current_shipment_yoy: number;
+  current_shipment_mom: number;
+  forecast_shipment_yoy: number;
+  forecast_shipment_mom: number;
+  current_arrival_yoy: number;
+  current_arrival_mom: number;
+  next_arrival_yoy: number;
+  shipment_forecast_diff: number;
+  arrival_forecast_diff: number;
+  monthly_comparison: ComparisonData[];
+  port_distribution: PortDistributionData[];
+  port_details: PortData[];
+  customs_details: CustomsData[];
+  created_at: string;
+  updated_at: string;
 }
 
 const SoybeanImport: React.FC = () => {
@@ -164,7 +175,7 @@ const SoybeanImport: React.FC = () => {
     const fetchData = async () => {
       try {
         const response = await fetchSoybeanImportData();
-        setData(response);
+        setData(response as SoybeanImportData);
       } catch (error) {
         console.error('获取数据失败:', error);
       } finally {
@@ -177,35 +188,58 @@ const SoybeanImport: React.FC = () => {
   const getComparisonChartOption = (): EChartsOption => {
     if (!data?.monthly_comparison) return {};
     
+    const months = Array.from(new Set(data.monthly_comparison.map(item => item.month)));
+    const actualData = data.monthly_comparison.filter(item => item.type === 'actual');
+    const forecastData = data.monthly_comparison.filter(item => item.type === 'forecast');
+    
     return {
       tooltip: {
         trigger: 'axis',
+        formatter: function(params: any) {
+          const month = params[0].axisValue;
+          let result = `${month}<br/>`;
+          params.forEach((param: any) => {
+            result += `${param.seriesName}: ${param.value.toLocaleString()} 万吨<br/>`;
+          });
+          return result;
+        }
       },
       legend: {
-        data: ['实际到港', '预计到港']
+        data: ['实际装船', '预计装船']
       },
       xAxis: {
         type: 'category',
-        data: Array.from(new Set(data.monthly_comparison.map(item => item.month))),
+        data: months,
+        axisLabel: {
+          formatter: (value: string) => {
+            const date = new Date(value);
+            return `${date.getFullYear()}年${date.getMonth() + 1}月`;
+          }
+        }
       },
       yAxis: {
         type: 'value',
-        name: '万吨'
+        name: '万吨',
+        axisLabel: {
+          formatter: (value: number) => value.toLocaleString()
+        }
       },
       series: [
         {
-          name: '实际到港',
+          name: '实际装船',
           type: 'bar',
-          data: data.monthly_comparison
-            .filter(item => item.type === 'actual')
-            .map(item => item.value),
+          data: actualData.map(item => item.value),
+          itemStyle: {
+            color: '#3B82F6'
+          }
         },
         {
-          name: '预计到港',
+          name: '预计装船',
           type: 'bar',
-          data: data.monthly_comparison
-            .filter(item => item.type === 'forecast')
-            .map(item => item.value),
+          data: forecastData.map(item => item.value),
+          itemStyle: {
+            color: '#10B981'
+          }
         }
       ]
     };
@@ -213,26 +247,67 @@ const SoybeanImport: React.FC = () => {
 
   const getPortDistributionOption = (): EChartsOption => {
     if (!data?.port_distribution) return {};
+    
+    // 按value值降序排序
+    const sortedData = [...data.port_distribution].sort((a, b) => b.value - a.value);
+    
     return {
       tooltip: {
         trigger: 'axis',
+        formatter: function(params: any) {
+          return `${params[0].name}<br/>${params[0].value.toLocaleString()} 吨`;
+        }
+      },
+      grid: {
+        left: '3%',
+        right: '4%',
+        bottom: '3%',
+        containLabel: true
       },
       xAxis: {
-        type: 'category',
-        data: data.port_distribution.map(item => item.port),
+        type: 'value',
+        name: '吨',
+        axisLabel: {
+          formatter: (value: number) => value.toLocaleString()
+        }
       },
       yAxis: {
-        type: 'value',
-        name: '万吨'
+        type: 'category',
+        data: sortedData.map(item => item.port),
+        axisLabel: {
+          interval: 0,
+          rotate: 0
+        }
       },
       series: [
         {
           name: '港口分布',
           type: 'bar',
-          data: data.port_distribution.map(item => item.value),
-        },
+          data: sortedData.map(item => item.value),
+          itemStyle: {
+            color: function(params: any) {
+              const colors = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6'];
+              return colors[params.dataIndex % colors.length];
+            }
+          },
+          label: {
+            show: true,
+            position: 'right',
+            formatter: (params: any) => params.value.toLocaleString()
+          }
+        }
       ]
     };
+  };
+
+  // 辅助函数：根据数值返回颜色类名
+  const getColorClass = (value: number) => {
+    return value >= 0 ? 'text-red-600' : 'text-green-600';
+  };
+
+  // 辅助函数：格式化百分比
+  const formatPercentage = (value: number) => {
+    return `${value >= 0 ? '+' : ''}${value.toFixed(2)}%`;
   };
 
   if (loading) {
@@ -244,13 +319,16 @@ const SoybeanImport: React.FC = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="text-center mb-12">
           <h1 className="text-3xl font-bold text-gray-900 relative inline-block">
-          大豆进口分析
+            大豆进口分析
             <span className="absolute -top-3 -right-12 bg-gradient-to-r from-yellow-400 to-yellow-600 text-white text-xs font-bold px-2 py-1 rounded-full shadow-md transform rotate-12">
               PRO
             </span>
           </h1>
           <p className="mt-4 text-lg text-gray-500">
-          实时监控大豆进口数据，分析港口分布和海关通关情况
+            实时监控大豆进口数据，分析港口分布和海关通关情况
+          </p>
+          <p className="mt-2 text-sm text-gray-400">
+            最后更新: {data?.date ? new Date(data.date).toLocaleDateString('zh-CN') : '-'}
           </p>
         </div>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
@@ -272,38 +350,83 @@ const SoybeanImport: React.FC = () => {
           <div className="bg-white p-6 rounded-lg shadow">
             <h3 className="text-sm font-medium text-gray-500">当前装船量</h3>
             <p className="mt-2 text-3xl font-semibold text-gray-900">{data?.current_shipment?.toLocaleString() || 0} 万吨</p>
-            <p className="mt-2 text-sm text-gray-500">
-              同比 <span className={(data?.current_shipment_yoy || 0) >= 0 ? "text-green-600" : "text-red-600"}>
-                {(data?.current_shipment_yoy || 0).toFixed(2)}%
-              </span>
-            </p>
+            <div className="mt-2 space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-gray-500">同比</span>
+                <span className={`text-sm font-semibold ${getColorClass(data?.current_shipment_yoy || 0)}`}>
+                  {formatPercentage(data?.current_shipment_yoy || 0)}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-gray-500">环比</span>
+                <span className={`text-sm font-semibold ${getColorClass(data?.current_shipment_mom || 0)}`}>
+                  {formatPercentage(data?.current_shipment_mom || 0)}
+                </span>
+              </div>
+            </div>
           </div>
+
           <div className="bg-white p-6 rounded-lg shadow">
             <h3 className="text-sm font-medium text-gray-500">预计装船量</h3>
             <p className="mt-2 text-3xl font-semibold text-gray-900">{data?.forecast_shipment?.toLocaleString() || 0} 万吨</p>
-            <p className="mt-2 text-sm text-gray-500">
-              同比 <span className={(data?.forecast_shipment_yoy || 0) >= 0 ? "text-green-600" : "text-red-600"}>
-                {(data?.forecast_shipment_yoy || 0).toFixed(2)}%
-              </span>
-            </p>
+            <div className="mt-2 space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-gray-500">同比</span>
+                <span className={`text-sm font-semibold ${getColorClass(data?.forecast_shipment_yoy || 0)}`}>
+                  {formatPercentage(data?.forecast_shipment_yoy || 0)}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-gray-500">环比</span>
+                <span className={`text-sm font-semibold ${getColorClass(data?.forecast_shipment_mom || 0)}`}>
+                  {formatPercentage(data?.forecast_shipment_mom || 0)}
+                </span>
+              </div>
+              <div className="flex items-center justify-between mt-1 pt-1 border-t border-gray-100">
+                <span className="text-sm text-gray-500">预期差异</span>
+                <span className={`text-sm font-semibold ${getColorClass(data?.shipment_forecast_diff || 0)}`}>
+                  {(data?.shipment_forecast_diff || 0).toLocaleString()} 万吨
+                </span>
+              </div>
+            </div>
           </div>
+
           <div className="bg-white p-6 rounded-lg shadow">
             <h3 className="text-sm font-medium text-gray-500">当前到港量</h3>
             <p className="mt-2 text-3xl font-semibold text-gray-900">{data?.current_arrival?.toLocaleString() || 0} 万吨</p>
-            <p className="mt-2 text-sm text-gray-500">
-              同比 <span className={(data?.current_arrival_yoy || 0) >= 0 ? "text-green-600" : "text-red-600"}>
-                {(data?.current_arrival_yoy || 0).toFixed(2)}%
-              </span>
-            </p>
+            <div className="mt-2 space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-gray-500">同比</span>
+                <span className={`text-sm font-semibold ${getColorClass(data?.current_arrival_yoy || 0)}`}>
+                  {formatPercentage(data?.current_arrival_yoy || 0)}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-gray-500">环比</span>
+                <span className={`text-sm font-semibold ${getColorClass(data?.current_arrival_mom || 0)}`}>
+                  {formatPercentage(data?.current_arrival_mom || 0)}
+                </span>
+              </div>
+            </div>
           </div>
+
           <div className="bg-white p-6 rounded-lg shadow">
             <h3 className="text-sm font-medium text-gray-500">预计到港量</h3>
             <p className="mt-2 text-3xl font-semibold text-gray-900">{data?.next_arrival?.toLocaleString() || 0} 万吨</p>
-            <p className="mt-2 text-sm text-gray-500">
-              同比 <span className={(data?.next_arrival_yoy || 0) >= 0 ? "text-green-600" : "text-red-600"}>
-                {(data?.next_arrival_yoy || 0).toFixed(2)}%
-              </span>
-            </p>
+            <div className="mt-2 space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-gray-500">同比</span>
+                <span className={`text-sm font-semibold ${getColorClass(data?.next_arrival_yoy || 0)}`}>
+                  {formatPercentage(data?.next_arrival_yoy || 0)}
+                </span>
+              </div>
+              <div className="flex items-center justify-between mt-1 pt-1 border-t border-gray-100">
+                <span className="text-sm text-gray-500">预期差异</span>
+                <span className={`text-sm font-semibold ${getColorClass(data?.arrival_forecast_diff || 0)}`}>
+                  {(data?.arrival_forecast_diff || 0).toLocaleString()} 万吨
+                </span>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -362,13 +485,13 @@ const SoybeanImport: React.FC = () => {
                             {item.port}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {item.current.toLocaleString()} 万吨
+                            {item.current.toLocaleString()} 吨
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {item.next_month.toLocaleString()} 万吨
+                            {item.next_month.toLocaleString()} 吨
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {item.next_two_month.toLocaleString()} 万吨
+                            {item.next_two_month.toLocaleString()} 吨
                           </td>
                         </tr>
                       ))}
@@ -407,16 +530,16 @@ const SoybeanImport: React.FC = () => {
                             {item.customs}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {item.current.toLocaleString()} 万吨
+                            {item.current.toLocaleString()} 吨
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {item.next_period.toLocaleString()} 万吨
+                            {item.next_period.toLocaleString()} 吨
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {item.next_month.toLocaleString()} 万吨
+                            {item.next_month.toLocaleString()} 吨
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {item.next_two_month.toLocaleString()} 万吨
+                            {item.next_two_month.toLocaleString()} 吨
                           </td>
                         </tr>
                       ))}
