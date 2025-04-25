@@ -1,7 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
 import KLineChart from '../components/KLineChart';
-import { Card, Statistic, Row, Col, Spin, Button } from 'antd';
-import { ArrowUpOutlined, ArrowDownOutlined } from '@ant-design/icons';
 import axios from 'axios';
 import { API_BASE_URL } from '../config/api';
 import Toast from '../components/Toast';
@@ -27,6 +25,13 @@ interface SRLevel {
   retest_times: string[];
   timeframe: string;
 }
+
+const SkeletonCard = () => (
+  <div className="bg-gray-50 p-4 rounded-lg animate-pulse">
+    <div className="h-4 bg-gray-200 rounded w-20 mb-2"></div>
+    <div className="h-8 bg-gray-200 rounded w-24"></div>
+  </div>
+);
 
 const MarketView: React.FC = () => {
   const [loading, setLoading] = useState(false);
@@ -137,87 +142,76 @@ const MarketView: React.FC = () => {
         </div>
 
         <div className="mb-8">
-          <Row gutter={16}>
-            <Col span={6}>
-              <Card>
-                <Statistic
-                  title="最新价"
-                  value={marketData.price}
-                  precision={0}
-                  valueStyle={{ color: marketData.change >= 0 ? '#cf1322' : '#3f8600' }}
-                  prefix={marketData.change >= 0 ? <ArrowUpOutlined /> : <ArrowDownOutlined />}
-                  suffix="元"
-                />
-              </Card>
-            </Col>
-            <Col span={6}>
-              <Card>
-                <Statistic
-                  title="涨跌幅"
-                  value={marketData.changePercent}
-                  precision={2}
-                  valueStyle={{ color: marketData.change >= 0 ? '#cf1322' : '#3f8600' }}
-                  prefix={marketData.change >= 0 ? <ArrowUpOutlined /> : <ArrowDownOutlined />}
-                  suffix="%"
-                />
-              </Card>
-            </Col>
-            <Col span={6}>
-              <Card>
-                <Statistic
-                  title="成交量"
-                  value={marketData.volume}
-                  precision={0}
-                  suffix="手"
-                />
-              </Card>
-            </Col>
-            <Col span={6}>
-              <Card>
-                <Statistic
-                  title="持仓量"
-                  value={marketData.openInterest}
-                  precision={0}
-                  suffix="手"
-                />
-              </Card>
-            </Col>
-          </Row>
+          {loading ? (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <SkeletonCard />
+              <SkeletonCard />
+              <SkeletonCard />
+              <SkeletonCard />
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="bg-gray-50 p-4 rounded-lg">
+                <p className="text-sm text-gray-500">最新价</p>
+                <p className={`text-2xl font-bold ${marketData.change >= 0 ? 'text-red-600' : 'text-green-600'}`}>
+                  ¥{marketData.price.toFixed(2)}
+                </p>
+              </div>
+              <div className="bg-gray-50 p-4 rounded-lg">
+                <p className="text-sm text-gray-500">涨跌幅</p>
+                <p className={`text-2xl font-bold ${marketData.change >= 0 ? 'text-red-600' : 'text-green-600'}`}>
+                  {marketData.changePercent.toFixed(2)}%
+                </p>
+              </div>
+              <div className="bg-gray-50 p-4 rounded-lg">
+                <p className="text-sm text-gray-500">成交量</p>
+                <p className="text-2xl font-bold text-gray-900">
+                  {marketData.volume.toLocaleString()}
+                </p>
+              </div>
+              <div className="bg-gray-50 p-4 rounded-lg">
+                <p className="text-sm text-gray-500">持仓量</p>
+                <p className="text-2xl font-bold text-gray-900">
+                  {marketData.openInterest.toLocaleString()}
+                </p>
+              </div>
+            </div>
+          )}
         </div>
 
-        <div className="bg-white rounded-lg">
+        <div className="bg-white rounded-lg p-6 mb-8">
           <div className="flex justify-between items-center mb-6">
-            <h1 className="text-2xl font-bold">豆粕2509合约行情</h1>
-            <div className="flex items-center">
-              {loading && <Spin className="mr-4" />}
-            </div>
+            <h2 className="text-2xl font-bold text-gray-900">豆粕2509合约行情</h2>
+            {loading && (
+              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-900"></div>
+            )}
           </div>
           <div>
             <KLineChart ref={chartRef} />
           </div>
         </div>
-        <div className="bg-white rounded-lg mt-6">
+
+        <div className="bg-white rounded-lg p-6">
           <div className="flex justify-between items-center mb-6">
-            <h1 className="text-2xl font-bold">操盘策略（DeepSeek提示）</h1>
-            <div className="flex items-center">
-              {loading && <Spin className="mr-4" />}
-              <Button 
-                type="primary" 
+            <h2 className="text-2xl font-bold text-gray-900">操盘策略（DeepSeek提示）</h2>
+            <div className="flex items-center gap-4">
+              {loading && (
+                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-900"></div>
+              )}
+              <button 
+                className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition duration-150 ease-in-out"
                 onClick={async () => {
                   try {
                     setLoading(true);
-                    setStreamingStrategy(''); // 清空之前的内容
-                    setStrategy(''); // 清空之前的完整内容
+                    setStreamingStrategy('');
+                    setStrategy('');
                     
-                    // 清理之前的 EventSource
                     cleanupEventSource();
 
-                    // 获取当前K线图的sr_levels数据
                     const chartInstance = chartRef.current?.getEchartsInstance();
                     const option = chartInstance?.getOption();
                     const markLines = option?.series[0]?.markLine?.data || [];
                     
-                    // 转换为后端需要的格式
                     const sr_levels = markLines.map((line: any) => ({
                       price: Number(line[0].coord[1]),
                       type: line[0].name === 'Support' ? 'Support' : 'Resistance',
@@ -228,7 +222,6 @@ const MarketView: React.FC = () => {
                       timeframe: '30m'
                     }));
 
-                    // 发送 POST 请求并处理流式响应
                     const response = await fetch(`${API_BASE_URL}/market/strategy`, {
                       method: 'POST',
                       headers: {
@@ -242,7 +235,6 @@ const MarketView: React.FC = () => {
                       throw new Error('Strategy request failed');
                     }
 
-                    // 创建响应流读取器
                     const reader = response.body?.getReader();
                     const decoder = new TextDecoder();
 
@@ -250,7 +242,6 @@ const MarketView: React.FC = () => {
                       throw new Error('Failed to create stream reader');
                     }
 
-                    // 读取流数据
                     while (true) {
                       const { done, value } = await reader.read();
                       if (done) {
@@ -258,7 +249,6 @@ const MarketView: React.FC = () => {
                         break;
                       }
 
-                      // 解码并处理数据
                       const text = decoder.decode(value);
                       const lines = text.split('\n');
                       
@@ -280,7 +270,6 @@ const MarketView: React.FC = () => {
                         }
                       }
                     }
-
                   } catch (error) {
                     console.error('获取策略失败:', error);
                     setToast({
@@ -292,11 +281,11 @@ const MarketView: React.FC = () => {
                 }}
               >
                 立即获取
-              </Button>
+              </button>
             </div>
           </div>
           {(streamingStrategy || strategy) && (
-            <div className="strategy-content p-4 whitespace-pre-wrap">
+            <div className="prose max-w-none">
               <ReactMarkdown>{streamingStrategy || strategy}</ReactMarkdown>
             </div>
           )}

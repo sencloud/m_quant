@@ -52,6 +52,13 @@ interface CustomsData {
   next_two_month: number;
 }
 
+interface PolicyEvent {
+  date: string;
+  event: string;
+  impact: string;
+  type: string;
+}
+
 interface SoybeanImportData {
   date: string;
   current_shipment: number;
@@ -74,6 +81,7 @@ interface SoybeanImportData {
   port_distribution: PortDistributionData[];
   port_details: PortData[];
   customs_details: CustomsData[];
+  policy_events: PolicyEvent[];
   created_at: string;
   updated_at: string;
 }
@@ -101,30 +109,76 @@ const SoybeanImport: React.FC = () => {
   const getTrendLineOption = (): EChartsOption => {
     if (!data?.monthly_comparison) return {};
     
-    const months = Array.from(new Set(data.monthly_comparison.map(item => item.month))).sort();
-    const colors = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6'];
-    const series: LineSeriesOption[] = ['实际装船量', '预报装船量', '实际到港量', '预报到港量'].map((type, index) => ({
-      name: type,
-      type: 'line',
-      data: months.map(month => {
-        const item = data.monthly_comparison.find(d => d.month === month && d.type === type);
-        return item ? item.value : null;
-      }),
-      yAxisIndex: 0,
-      itemStyle: {
-        color: colors[index]
-      },
-      lineStyle: {
-        color: colors[index],
-        width: 2
+    // 按类型和日期对数据进行分组
+    const groupedData = data.monthly_comparison.reduce((acc, item) => {
+      if (!acc[item.type]) {
+        acc[item.type] = [];
       }
-    }));
+      acc[item.type].push({
+        month: item.month,
+        value: item.value,
+        date: new Date(item.month)
+      });
+      return acc;
+    }, {} as Record<string, { month: string; value: number; date: Date }[]>);
 
-    // 添加同比增幅曲线
+    // 获取所有唯一日期并排序
+    const allDates = Array.from(new Set(data.monthly_comparison.map(item => item.month)))
+      .map(date => new Date(date))
+      .sort((a, b) => a.getTime() - b.getTime());
+
+    const colors = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6'];
+    const series: LineSeriesOption[] = ['实际装船量', '预报装船量', '实际到港量', '预报到港量'].map((type, index) => {
+      const typeData = groupedData[type] || [];
+      // 确保数据按日期排序
+      typeData.sort((a, b) => a.date.getTime() - b.date.getTime());
+      
+      return {
+        name: type,
+        type: 'line',
+        data: typeData.map(item => item.value),
+        yAxisIndex: 0,
+        itemStyle: {
+          color: colors[index]
+        },
+        lineStyle: {
+          color: colors[index],
+          width: 2
+        },
+        symbol: 'circle',
+        symbolSize: 8,
+        label: {
+          show: true,
+          position: 'top',
+          formatter: '{c}',
+          fontSize: 12,
+          color: colors[index]
+        }
+      };
+    });
+
+    // 计算同比增长
+    const actualShipmentData = groupedData['实际装船量'] || [];
+    const yoyData = actualShipmentData.map(current => {
+      const prevYearDate = new Date(current.date);
+      prevYearDate.setFullYear(prevYearDate.getFullYear() - 1);
+      
+      const prevYearData = actualShipmentData.find(d => {
+        const isSameMonth = d.date.getMonth() === prevYearDate.getMonth();
+        const isSameHalf = (d.date.getDate() > 15) === (current.date.getDate() > 15);
+        return isSameMonth && isSameHalf;
+      });
+      
+      if (!prevYearData) return null;
+      return Number(((current.value - prevYearData.value) / prevYearData.value * 100).toFixed(2));
+    });
+
+    // 添加同比增长曲线
     series.push({
-      name: '同比增幅',
+      name: '实际装船量同比增幅',
       type: 'line',
       yAxisIndex: 1,
+      data: yoyData,
       itemStyle: {
         color: colors[4]
       },
@@ -132,18 +186,15 @@ const SoybeanImport: React.FC = () => {
         color: colors[4],
         width: 2
       },
-      data: months.map(month => {
-        const currentItem = data.monthly_comparison.find(d => d.month === month && d.type === '实际装船量');
-        const prevDate = new Date(month);
-        prevDate.setFullYear(prevDate.getFullYear() - 1);
-        const prevMonth = prevDate.toISOString().split('T')[0].substring(0, 7);
-        const prevItem = data.monthly_comparison.find(d => 
-          d.month.startsWith(prevMonth) && d.type === '实际装船量'
-        );
-        
-        if (!currentItem || !prevItem) return null;
-        return Number(((currentItem.value - prevItem.value) / prevItem.value * 100).toFixed(2));
-      })
+      symbol: 'circle',
+      symbolSize: 8,
+      label: {
+        show: true,
+        position: 'top',
+        formatter: '{c}%',
+        fontSize: 12,
+        color: colors[4]
+      }
     });
 
     return {
@@ -152,30 +203,42 @@ const SoybeanImport: React.FC = () => {
         trigger: 'axis',
         axisPointer: { type: 'cross' }
       },
-      legend: { data: ['实际装船量', '预报装船量', '实际到港量', '预报到港量', '同比增幅'] },
-      grid: { right: '10%' },
+      legend: { 
+        data: ['实际装船量', '预报装船量', '实际到港量', '预报到港量', '实际装船量同比增幅'],
+        textStyle: { fontSize: 12 }
+      },
+      grid: { right: '10%', top: '15%', bottom: '15%' },
       xAxis: {
         type: 'category',
-        data: months,
+        data: allDates.map(date => {
+          const month = date.getMonth() + 1;
+          const isSecondHalf = date.getDate() > 15;
+          return `${date.getFullYear()}/${month}${isSecondHalf ? '下' : '上'}`;
+        }),
         axisLabel: {
-          formatter: (value: string) => {
-            const date = new Date(value);
-            return `${date.getFullYear()}/${date.getMonth() + 1}`;
-          }
+          interval: 0,
+          rotate: 45,
+          fontSize: 12
         }
       },
       yAxis: [
         {
           type: 'value',
           name: '数量(万吨)',
-          position: 'left'
+          position: 'left',
+          axisLabel: {
+            fontSize: 12
+          }
         },
         {
           type: 'value',
           name: '同比增幅(%)',
           position: 'right',
           axisLine: { show: true },
-          axisLabel: { formatter: '{value}%' }
+          axisLabel: { 
+            formatter: '{value}%',
+            fontSize: 12
+          }
         }
       ],
       series
@@ -185,43 +248,142 @@ const SoybeanImport: React.FC = () => {
   const getBoxplotOption = (): EChartsOption => {
     if (!data?.monthly_comparison) return {};
 
-    // 按月份分组计算箱线图数据
-    const monthlyStats = data.monthly_comparison.reduce((acc, curr) => {
-      const month = new Date(curr.month).getMonth() + 1;
-      if (!acc[month]) acc[month] = [];
-      acc[month].push(curr.value);
-      return acc;
-    }, {} as Record<number, number[]>);
+    // Debug: 打印原始数据
+    console.log('Original Data:', data.monthly_comparison);
+
+    // 只按月份分组，不考虑年份，并确保数据是数值类型
+    const monthlyStats = data.monthly_comparison
+      .filter(item => item.type === "实际到港量")
+      .reduce((acc, curr) => {
+        const month = new Date(curr.month).getMonth() + 1;
+        const value = Number(curr.value);
+        if (!acc[month]) acc[month] = [];
+        if (!isNaN(value)) {  // 只添加有效的数值
+          acc[month].push(value);
+        }
+        return acc;
+      }, {} as Record<number, number[]>);
+
+    // Debug: 打印按月分组的数据
+    console.log('Monthly Stats:', monthlyStats);
 
     // 计算箱线图数据
-    const boxData = Object.entries(monthlyStats).map(([month, values]) => {
-      values.sort((a, b) => a - b);
-      const q1 = values[Math.floor(values.length * 0.25)];
-      const q3 = values[Math.floor(values.length * 0.75)];
+    const boxplotData: number[][] = [];
+    const outlierData: [number, number][] = [];
+
+    Array.from({ length: 12 }, (_, i) => i + 1).forEach(month => {
+      const values = monthlyStats[month] || [];
+      
+      // Debug: 打印每月的值
+      console.log(`Month ${month} values:`, values);
+      
+      // 如果某月没有数据，使用null
+      if (values.length === 0) {
+        boxplotData[month - 1] = [0, 0, 0, 0, 0];  // ECharts需要有值，即使是0
+        return;
+      }
+
+      // 对数据点计算统计量
+      const sortedValues = [...values].sort((a, b) => a - b);
+      
+      // 如果只有一个数据点，使用该值作为所有统计量
+      if (sortedValues.length === 1) {
+        const value = sortedValues[0];
+        boxplotData[month - 1] = [value, value, value, value, value];
+        return;
+      }
+
+      // 如果有两个数据点，使用较小值作为最小值和Q1，较大值作为最大值和Q3，平均值作为中位数
+      if (sortedValues.length === 2) {
+        const min = sortedValues[0];
+        const max = sortedValues[1];
+        const median = (min + max) / 2;
+        boxplotData[month - 1] = [min, min, median, max, max];
+        return;
+      }
+
+      // 对三个或更多数据点计算完整的箱线图统计量
+      const q1 = sortedValues[Math.floor((sortedValues.length - 1) * 0.25)];
+      const q3 = sortedValues[Math.floor((sortedValues.length - 1) * 0.75)];
+      const median = sortedValues[Math.floor((sortedValues.length - 1) * 0.5)];
       const iqr = q3 - q1;
-      const min = Math.max(q1 - 1.5 * iqr, values[0]);
-      const max = Math.min(q3 + 1.5 * iqr, values[values.length - 1]);
-      return [min, q1, values[Math.floor(values.length * 0.5)], q3, max];
+      const lowerBound = q1 - 1.5 * iqr;
+      const upperBound = q3 + 1.5 * iqr;
+
+      // 找出异常值
+      const monthOutliers = values.filter(v => v < lowerBound || v > upperBound);
+      monthOutliers.forEach(value => {
+        outlierData.push([month - 1, value]);  // ECharts的索引从0开始
+      });
+
+      // 计算有效的最小值和最大值（排除异常值）
+      const validValues = values.filter(v => v >= lowerBound && v <= upperBound);
+      const min = validValues.length > 0 ? Math.min(...validValues) : sortedValues[0];
+      const max = validValues.length > 0 ? Math.max(...validValues) : sortedValues[sortedValues.length - 1];
+
+      boxplotData[month - 1] = [min, q1, median, q3, max];
+
+      // Debug: 打印计算结果
+      console.log(`Month ${month} stats:`, { min, q1, median, q3, max, outliers: monthOutliers });
     });
 
+    // Debug: 打印最终数据
+    console.log('Boxplot Data:', boxplotData);
+    console.log('Outlier Data:', outlierData);
+
     return {
-      title: { text: '月度波动箱线图' },
-      tooltip: { trigger: 'item' },
-      grid: { left: '10%', right: '10%' },
+      title: { text: '月度到港量波动分析' },
+      tooltip: { 
+        trigger: 'item',
+        formatter: (params: any) => {
+          if (params.seriesIndex === 1) {
+            return `异常值: ${params.data[1].toFixed(2)}万吨`;
+          }
+          const data = params.data;
+          return `最小值: ${data[1].toFixed(2)}万吨<br/>
+                  下四分位: ${data[2].toFixed(2)}万吨<br/>
+                  中位数: ${data[3].toFixed(2)}万吨<br/>
+                  上四分位: ${data[4].toFixed(2)}万吨<br/>
+                  最大值: ${data[5].toFixed(2)}万吨`;
+        }
+      },
+      grid: { left: '10%', right: '10%', bottom: '15%' },
       xAxis: {
         type: 'category',
-        data: Array.from({ length: 12 }, (_, i) => `${i + 1}月`)
-      },
-      yAxis: { type: 'value', name: '数量(万吨)' },
-      series: [{
-        name: '箱线图',
-        type: 'boxplot',
-        data: boxData,
-        itemStyle: {
-          borderColor: '#3B82F6',
-          borderWidth: 2
+        data: Array.from({ length: 12 }, (_, i) => `${i + 1}月`),
+        boundaryGap: true,
+        nameGap: 30,
+        splitArea: { show: false },
+        axisLabel: {
+          formatter: '{value}'
         }
-      }]
+      },
+      yAxis: {
+        type: 'value',
+        name: '到港量(万吨)',
+        splitArea: { show: true }
+      },
+      series: [
+        {
+          name: '月度到港量',
+          type: 'boxplot',
+          data: boxplotData,
+          itemStyle: {
+            borderColor: '#3B82F6',
+            borderWidth: 2
+          },
+          boxWidth: ['40%', '40%'],
+          tooltip: { trigger: 'item' }
+        },
+        {
+          name: '异常值',
+          type: 'scatter',
+          data: outlierData,
+          itemStyle: {
+            color: '#EF4444'
+          }
+        }
+      ]
     };
   };
 
@@ -274,7 +436,12 @@ const SoybeanImport: React.FC = () => {
   };
 
   const getHeatmapOption = (data: SoybeanImportData): EChartsOption => {
-    const months = Array.from(new Set(data.monthly_comparison.map(item => item.month))).sort();
+    // 只获取今年的月份
+    const currentYear = new Date().getFullYear();
+    const months = Array.from(new Set(data.monthly_comparison
+      .filter(item => new Date(item.month).getFullYear() === currentYear)
+      .map(item => item.month)))
+      .sort();
     
     // 计算同比增长率
     const calculateYoY = (currentMonth: string, type: string) => {
@@ -297,34 +464,18 @@ const SoybeanImport: React.FC = () => {
     types.forEach((type, typeIndex) => {
       months.forEach((month, monthIndex) => {
         const yoyValue = calculateYoY(month, type);
-        if (yoyValue !== null) {
+        // 只添加有效的数据点
+        if (yoyValue !== null && !isNaN(yoyValue) && isFinite(yoyValue)) {
           heatmapData.push([monthIndex, typeIndex, yoyValue]);
         }
       });
     });
 
-    const series: HeatmapSeriesOption[] = [{
-      name: '同比增幅',
-      type: 'heatmap',
-      data: heatmapData,
-      label: {
-        show: true,
-        formatter: (params: any) => `${params.data[2].toFixed(1)}%`,
-        color: '#000000',
-        fontSize: 12,
-        position: 'inside'
-      },
-      itemStyle: {
-        borderColor: '#fff',
-        borderWidth: 1
-      },
-      emphasis: {
-        itemStyle: {
-          shadowBlur: 10,
-          shadowColor: 'rgba(0, 0, 0, 0.5)'
-        }
-      }
-    }];
+    // 计算有效值的范围
+    const validValues = heatmapData.map(item => item[2]);
+    const minValue = Math.min(...validValues);
+    const maxValue = Math.max(...validValues);
+    const absMax = Math.max(Math.abs(minValue), Math.abs(maxValue));
 
     return {
       title: { text: '同比增幅热力图' },
@@ -334,7 +485,8 @@ const SoybeanImport: React.FC = () => {
           const month = months[params.data[0]];
           const type = types[params.data[1]];
           const value = params.data[2];
-          return `${month}<br/>${type}<br/>同比增幅: ${value.toFixed(2)}%`;
+          const date = new Date(month);
+          return `${date.getFullYear()}年${date.getMonth() + 1}月<br/>${type}<br/>同比增幅: ${value.toFixed(2)}%`;
         }
       },
       grid: { 
@@ -345,17 +497,15 @@ const SoybeanImport: React.FC = () => {
       },
       xAxis: {
         type: 'category',
-        data: months,
+        data: months.map(month => {
+          const date = new Date(month);
+          return `${date.getMonth() + 1}月`;
+        }),
         splitArea: {
           show: true
         },
         axisLabel: {
-          formatter: (value: string) => {
-            const date = new Date(value);
-            return `${date.getFullYear()}/${date.getMonth() + 1}`;
-          },
-          interval: 0,
-          rotate: 45
+          interval: 0
         }
       },
       yAxis: {
@@ -366,8 +516,8 @@ const SoybeanImport: React.FC = () => {
         }
       },
       visualMap: {
-        min: -100,
-        max: 100,
+        min: -absMax,
+        max: absMax,
         calculable: true,
         orient: 'horizontal',
         left: 'center',
@@ -377,7 +527,24 @@ const SoybeanImport: React.FC = () => {
           color: ['#313695', '#4575b4', '#74add1', '#abd9e9', '#e0f3f8', '#ffffbf', '#fee090', '#fdae61', '#f46d43', '#d73027', '#a50026']
         }
       },
-      series
+      series: [{
+        name: '同比增幅',
+        type: 'heatmap',
+        data: heatmapData,
+        label: {
+          show: true,
+          formatter: (params: any) => `${params.data[2].toFixed(1)}%`,
+          color: '#000000',
+          fontSize: 12,
+          position: 'inside'
+        },
+        emphasis: {
+          itemStyle: {
+            shadowBlur: 10,
+            shadowColor: 'rgba(0, 0, 0, 0.5)'
+          }
+        }
+      }]
     };
   };
 
@@ -432,66 +599,84 @@ const SoybeanImport: React.FC = () => {
 
   // 四、政策与市场关联分析
   const getPolicyTimelineOption = (): EChartsOption => {
-    // 示例政策事件数据
-    const events = [
-      { date: '2024-01', event: '中美第一阶段经贸协议执行情况评估' },
-      { date: '2024-02', event: '巴西大豆收获季节开始' },
-      { date: '2024-03', event: '国内油厂压榨利润转负' }
-    ];
+    if (!data?.policy_events) return {};
+
+    const events = data.policy_events;
+    const eventTypes = Array.from(new Set(events.map(e => e.type)));
+    const typeColors = {
+      '贸易政策': '#3B82F6',
+      '供应因素': '#10B981',
+      '产业政策': '#F59E0B',
+      '市场因素': '#EF4444'
+    };
+
+    // 将事件按时间排序
+    const sortedEvents = [...events].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
     return {
-      timeline: {
-        data: events.map(e => e.date),
-        label: {
-          formatter: function(value: string | number): string {
-            const date = new Date(String(value));
-            return `${date.getFullYear()}/${date.getMonth() + 1}`;
-          },
-          color: '#333'
-        },
-        lineStyle: {
-          color: '#3B82F6',
-          width: 2
-        },
-        itemStyle: {
-          color: '#3B82F6',
-          borderWidth: 1,
-          borderColor: '#fff'
-        },
-        checkpointStyle: {
-          color: '#3B82F6',
-          borderColor: '#fff',
-          borderWidth: 2
-        },
-        controlStyle: {
-          color: '#3B82F6',
-          borderColor: '#3B82F6'
+      title: {
+        text: '政策事件影响分析',
+        left: 'center',
+        top: 10
+      },
+      tooltip: {
+        trigger: 'item',
+        formatter: function(params: any) {
+          const event = events.find(e => e.date === params.name);
+          if (!event) return '';
+          
+          return `<div style="font-weight: bold">${event.date}</div>
+                  <div style="margin-top: 5px">${event.event}</div>
+                  <div style="margin-top: 5px; color: #666">${event.impact}</div>
+                  <div style="margin-top: 5px">
+                    <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: ${typeColors[event.type as keyof typeof typeColors]}"></span>
+                    <span style="margin-left: 5px">${event.type}</span>
+                  </div>`;
         }
       },
-      baseOption: {
-        title: { text: '政策事件时间轴' },
-        tooltip: { trigger: 'axis' },
-        xAxis: { type: 'category' },
-        yAxis: { type: 'value' }
+      legend: {
+        data: eventTypes,
+        bottom: 10,
+        icon: 'circle',
+        itemWidth: 8,
+        itemHeight: 8,
+        textStyle: {
+          color: '#666'
+        }
       },
-      options: events.map(event => ({
-        title: { subtext: event.event },
-        series: [{
-          type: 'line',
-          data: data?.monthly_comparison
-            .filter(item => item.type === 'actual')
-            .map(item => item.value),
-          itemStyle: {
-            color: '#3B82F6'
+      xAxis: {
+        type: 'category',
+        data: sortedEvents.map(e => e.date),
+        axisLabel: {
+          formatter: (value: string) => {
+            const date = new Date(value);
+            return `${date.getMonth() + 1}月${date.getDate()}日`;
           },
-          lineStyle: {
-            color: '#3B82F6',
-            width: 2
-          },
-          areaStyle: {
-            color: '#DBEAFE'
-          }
-        }]
+          interval: 0,
+          rotate: 45
+        },
+        splitLine: { show: false }
+      },
+      yAxis: {
+        type: 'category',
+        data: eventTypes,
+        axisLine: { show: false },
+        axisTick: { show: false },
+        splitLine: { show: false }
+      },
+      series: eventTypes.map(type => ({
+        name: type,
+        type: 'scatter',
+        symbolSize: 15,
+        data: sortedEvents
+          .filter(e => e.type === type)
+          .map(e => ({
+            name: e.date,
+            value: [e.date, type],
+            itemStyle: {
+              color: typeColors[type as keyof typeof typeColors]
+            }
+          }))
       }))
     };
   };
@@ -547,7 +732,16 @@ const SoybeanImport: React.FC = () => {
     <Layout>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">大豆进口分析</h1>
+          <h1 className="text-3xl font-bold text-gray-900 relative inline-block">
+            大豆进口分析
+            <span className="absolute -top-3 -right-12 bg-gradient-to-r from-yellow-400 to-yellow-600 text-white text-xs font-bold px-2 py-1 rounded-full shadow-md transform rotate-12">
+              PRO
+            </span>
+          </h1>
+          <p className="mt-4 text-lg text-gray-500">
+            基于大豆进口数据，分析进口量、装船量、到港量等指标的波动特征
+          </p>
+          
           <p className="mt-2 text-gray-500">最后更新: {data?.date ? new Date(data.date).toLocaleDateString('zh-CN') : '-'}</p>
         </div>
 
@@ -559,8 +753,8 @@ const SoybeanImport: React.FC = () => {
               { id: 'trend', name: '时间序列趋势' },
               { id: 'structure', name: '结构对比' },
               { id: 'supply', name: '供应链波动' },
-              { id: 'policy', name: '政策关联' },
-              { id: 'risk', name: '风险预警' }
+              // { id: 'policy', name: '政策关联' },
+              // { id: 'risk', name: '风险预警' }
             ].map((tab) => (
               <button
                 key={tab.id}
@@ -582,19 +776,8 @@ const SoybeanImport: React.FC = () => {
           <div className="space-y-8">
             <div className="bg-white p-6 rounded-lg shadow">
               <div className="prose max-w-none">
-                <h2 className="text-xl font-semibold text-gray-900 mb-6">一、数据概览</h2>
-                <div className="space-y-4">
-                  <p className="text-gray-700">
-                    <span className="font-semibold">实际装船量：</span>
-                    本期37.72万吨（同比+119.68%），但本月及下月预报装船量分别降至125.79万吨（同比-88.41%）、98.7万吨（同比-92.47%），呈现短期激增后断崖式下降。
-                  </p>
-                  <p className="text-gray-700">
-                    <span className="font-semibold">到港量：</span>
-                    本月实际到港983.7万吨（同比+21.92%），但下月预报到港675.48万吨（同比-40.16%），显示到港节奏前高后低。
-                  </p>
-                </div>
-
-                <h2 className="text-xl font-semibold text-gray-900 mt-8 mb-6">二、关键差异原因分析</h2>
+                <h2 className="text-xl font-semibold text-gray-900 mt-8 mb-6">关键差异原因分析</h2>
+                <p className="text-sm text-gray-500 mb-4">数据来源：<a href="https://wms.mofcom.gov.cn/dzncpjkxxfb/index.html" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">商务部大宗农产品进口信息发布</a></p>
                 <div className="space-y-6">
                   <div>
                     <h3 className="text-lg font-medium text-gray-900 mb-4">1. 装船与预报装船差异</h3>

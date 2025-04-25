@@ -6,7 +6,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from models.soybean import (
     SoybeanImportDB, SoybeanImport, PortDetail, CustomsDetail,
-    ComparisonData, PortDistributionData
+    ComparisonData, PortDistributionData, PolicyEvent
 )
 
 class SoybeanService:
@@ -36,6 +36,47 @@ class SoybeanService:
             return 0.0
         return (current - previous) / previous * 100
 
+    def _get_policy_events(self) -> List[PolicyEvent]:
+        """获取政策事件数据"""
+        return [
+            PolicyEvent(
+                date="2024-01",
+                event="中美第一阶段经贸协议执行情况评估",
+                impact="关注中美农产品贸易承诺履行情况，影响大豆进口配额和关税政策",
+                type="贸易政策"
+            ),
+            PolicyEvent(
+                date="2024-02",
+                event="巴西大豆收获季节开始",
+                impact="巴西大豆产量预期下调，天气因素影响收获进度，出口竞争力减弱",
+                type="供应因素"
+            ),
+            PolicyEvent(
+                date="2024-02",
+                event="中央一号文件发布",
+                impact="强调保障粮食安全，提出扩大大豆种植面积，加强国产大豆生产",
+                type="产业政策"
+            ),
+            PolicyEvent(
+                date="2024-03",
+                event="国内油厂压榨利润转负",
+                impact="豆粕需求疲软，油厂开机率下降，影响进口采购积极性",
+                type="市场因素"
+            ),
+            PolicyEvent(
+                date="2024-03",
+                event="美豆种植意向报告发布",
+                impact="美国大豆种植面积预期增加，影响国际大豆价格走势",
+                type="市场因素"
+            ),
+            PolicyEvent(
+                date="2024-04",
+                event="阿根廷取消农产品出口税",
+                impact="提升阿根廷大豆出口竞争力，改变全球供应格局",
+                type="贸易政策"
+            )
+        ]
+
     def get_soybean_import_data(self) -> SoybeanImport:
         """获取大豆进口数据"""
         db = None
@@ -56,7 +97,8 @@ class SoybeanService:
                     current_month_arrival=0.0,
                     next_month_arrival=0.0,
                     port_details=[],
-                    customs_details=[]
+                    customs_details=[],
+                    policy_events=self._get_policy_events()
                 )
             
             # 获取去年同期数据
@@ -76,10 +118,11 @@ class SoybeanService:
             # 构建月度对比数据
             monthly_comparison: List[ComparisonData] = []
             try:
-                # 获取当年所有月份数据
+                # 获取去年1月1日以来的数据
                 current_year = current_data.date.year
+                last_year = current_year - 1
                 year_data = db.query(SoybeanImportDB).filter(
-                    SoybeanImportDB.date >= datetime(current_year, 1, 1),
+                    SoybeanImportDB.date >= datetime(last_year, 1, 1),
                     SoybeanImportDB.date <= datetime(current_year, 12, 31)
                 ).order_by(SoybeanImportDB.date.asc()).all()
                 
@@ -87,7 +130,7 @@ class SoybeanService:
                     # 实际装船量
                     monthly_comparison.append(
                         ComparisonData(
-                            month=data.date.strftime('%Y-%m'),
+                            month=data.date.strftime('%Y-%m-%d'),
                             value=data.current_shipment,
                             type="实际装船量"
                         )
@@ -95,7 +138,7 @@ class SoybeanService:
                     # 预测装船量
                     monthly_comparison.append(
                         ComparisonData(
-                            month=data.date.strftime('%Y-%m'),
+                            month=data.date.strftime('%Y-%m-%d'),
                             value=data.forecast_shipment,
                             type="预报装船量"
                         )
@@ -103,7 +146,7 @@ class SoybeanService:
                     # 实际到港量
                     monthly_comparison.append(
                         ComparisonData(
-                            month=data.date.strftime('%Y-%m'),
+                            month=data.date.strftime('%Y-%m-%d'),
                             value=data.current_arrival,
                             type="实际到港量"
                         )
@@ -111,7 +154,7 @@ class SoybeanService:
                     # 预测到港量
                     monthly_comparison.append(
                         ComparisonData(
-                            month=data.date.strftime('%Y-%m'),
+                            month=data.date.strftime('%Y-%m-%d'),
                             value=data.next_arrival,
                             type="预报到港量"
                         )
@@ -119,6 +162,34 @@ class SoybeanService:
             except Exception as e:
                 logger.error(f"构建月度对比数据失败: {e}")
                 monthly_comparison = []
+
+            # 添加示例政策事件数据
+            policy_events = [
+                {
+                    "date": "2024-01-15",
+                    "event": "中美第一阶段经贸协议执行情况评估",
+                    "impact": "可能影响大豆进口配额和关税政策",
+                    "type": "贸易政策"
+                },
+                {
+                    "date": "2024-02-01",
+                    "event": "巴西大豆收获季节开始",
+                    "impact": "供应量增加，价格可能下调",
+                    "type": "供应因素"
+                },
+                {
+                    "date": "2024-03-10",
+                    "event": "国内油厂补贴政策调整",
+                    "impact": "影响压榨利润，可能影响采购意愿",
+                    "type": "产业政策"
+                },
+                {
+                    "date": "2024-04-01",
+                    "event": "国际大豆期货价格波动",
+                    "impact": "贸易商观望情绪加重",
+                    "type": "市场因素"
+                }
+            ]
 
             # 构建基础响应对象
             result = SoybeanImport(
@@ -152,8 +223,9 @@ class SoybeanService:
                 # 详细数据
                 port_details=[PortDetail(**detail) for detail in current_data.port_details],
                 customs_details=[CustomsDetail(**detail) for detail in current_data.customs_details],
-                created_at=current_data.created_at,
-                updated_at=current_data.updated_at
+                policy_events=policy_events,
+                created_at=datetime.now(),
+                updated_at=datetime.now()
             )
             
             # 计算同比数据

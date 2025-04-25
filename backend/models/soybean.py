@@ -6,6 +6,13 @@ from sqlalchemy.ext.declarative import declarative_base
 
 Base = declarative_base()
 
+class PolicyEvent(BaseModel):
+    """政策事件模型"""
+    date: str
+    event: str
+    impact: str
+    type: str
+
 class SoybeanImportDB(Base):
     """大豆进口数据库模型"""
     __tablename__ = "soybean_imports"
@@ -25,6 +32,7 @@ class SoybeanImportDB(Base):
     
     port_details = Column(JSON, nullable=False)  # 存储港口详细数据
     customs_details = Column(JSON, nullable=False)  # 存储海关详细数据
+    policy_events = Column(JSON, nullable=True)  # 存储政策事件数据
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -90,8 +98,16 @@ class SoybeanImport(BaseModel):
     # 详细数据
     port_details: List[PortDetail]
     customs_details: List[CustomsDetail]
+    policy_events: List[PolicyEvent] = []
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
 
     class Config:
-        from_attributes = True 
+        from_attributes = True
+
+class PolicyEvent(BaseModel):
+    """政策事件模型"""
+    date: str
+    event: str
+    impact: str
+    type: str 
