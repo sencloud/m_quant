@@ -1,6 +1,5 @@
 from typing import List, Dict, Any, Optional
-from datetime import datetime, timedelta, date
-import logging
+from datetime import datetime, timedelta
 from config import settings
 from utils.logger import logger
 from sqlalchemy import create_engine
@@ -9,7 +8,6 @@ from models.soybean import (
     SoybeanImportDB, SoybeanImport, PortDetail, CustomsDetail,
     ComparisonData, PortDistributionData
 )
-import json
 
 class SoybeanService:
     """大豆进口数据服务"""
@@ -40,6 +38,7 @@ class SoybeanService:
 
     def get_soybean_import_data(self) -> SoybeanImport:
         """获取大豆进口数据"""
+        db = None
         try:
             db = self.SessionLocal()
             
@@ -60,15 +59,6 @@ class SoybeanService:
                     customs_details=[]
                 )
             
-            # 获取当年所有月份数据
-            current_year = current_data.date.year
-            year_start = datetime(current_year, 1, 1).date()
-            year_end = datetime(current_year, 12, 31).date()
-            year_data = db.query(SoybeanImportDB).filter(
-                SoybeanImportDB.date >= year_start,
-                SoybeanImportDB.date <= year_end
-            ).order_by(SoybeanImportDB.date.asc()).all()
-            
             # 获取去年同期数据
             last_year_date = current_data.date - timedelta(days=365)
             prev_year_data = db.query(SoybeanImportDB).filter(
@@ -84,33 +74,52 @@ class SoybeanService:
             ).first()
             
             # 构建月度对比数据
-            monthly_comparison = []
-            for data in year_data:
-                # 实际装船量
-                monthly_comparison.append(
-                    ComparisonData(
-                        month=data.date.strftime('%Y-%m'),
-                        value=data.current_shipment,
-                        type="actual"
+            monthly_comparison: List[ComparisonData] = []
+            try:
+                # 获取当年所有月份数据
+                current_year = current_data.date.year
+                year_data = db.query(SoybeanImportDB).filter(
+                    SoybeanImportDB.date >= datetime(current_year, 1, 1),
+                    SoybeanImportDB.date <= datetime(current_year, 12, 31)
+                ).order_by(SoybeanImportDB.date.asc()).all()
+                
+                for data in year_data:
+                    # 实际装船量
+                    monthly_comparison.append(
+                        ComparisonData(
+                            month=data.date.strftime('%Y-%m'),
+                            value=data.current_shipment,
+                            type="实际装船量"
+                        )
                     )
-                )
-                # 预测装船量
-                monthly_comparison.append(
-                    ComparisonData(
-                        month=data.date.strftime('%Y-%m'),
-                        value=data.forecast_shipment,
-                        type="forecast"
+                    # 预测装船量
+                    monthly_comparison.append(
+                        ComparisonData(
+                            month=data.date.strftime('%Y-%m'),
+                            value=data.forecast_shipment,
+                            type="预报装船量"
+                        )
                     )
-                )
-                # 实际到港量
-                monthly_comparison.append(
-                    ComparisonData(
-                        month=data.date.strftime('%Y-%m'),
-                        value=data.current_arrival,
-                        type="arrival"
+                    # 实际到港量
+                    monthly_comparison.append(
+                        ComparisonData(
+                            month=data.date.strftime('%Y-%m'),
+                            value=data.current_arrival,
+                            type="实际到港量"
+                        )
                     )
-                )
-            
+                    # 预测到港量
+                    monthly_comparison.append(
+                        ComparisonData(
+                            month=data.date.strftime('%Y-%m'),
+                            value=data.next_arrival,
+                            type="预报到港量"
+                        )
+                    )
+            except Exception as e:
+                logger.error(f"构建月度对比数据失败: {e}")
+                monthly_comparison = []
+
             # 构建基础响应对象
             result = SoybeanImport(
                 date=current_data.date.strftime("%Y-%m-%d"),
@@ -124,15 +133,6 @@ class SoybeanService:
                 next_arrival=current_data.next_arrival,
                 current_month_arrival=current_data.current_month_arrival,
                 next_month_arrival=current_data.next_month_arrival,
-                
-                # 同环比数据 - 初始化为0
-                current_shipment_yoy=0.0,
-                current_shipment_mom=0.0,
-                forecast_shipment_yoy=0.0,
-                forecast_shipment_mom=0.0,
-                current_arrival_yoy=0.0,
-                current_arrival_mom=0.0,
-                next_arrival_yoy=0.0,
                 
                 # 预期差异
                 shipment_forecast_diff=current_data.current_shipment - current_data.forecast_shipment,
@@ -190,14 +190,91 @@ class SoybeanService:
                     prev_month_data.current_arrival
                 )
             
-            logger.info("成功获取大豆进口数据")
+            logger.info(f"成功获取大豆进口数据，当前日期：{current_data.date}")
             return result
             
         except Exception as e:
             logger.error(f"获取大豆进口数据失败: {e}")
-            import traceback
-            traceback.print_exc()
             raise
         finally:
-            if 'db' in locals():
-                db.close() 
+            if db:
+                try:
+                    db.close()
+                except Exception as e:
+                    logger.error(f"关闭数据库连接失败: {e}")
+
+    def get_monthly_comparison(self) -> List[ComparisonData]:
+        """获取月度对比数据"""
+        db = None
+        try:
+            db = self.SessionLocal()
+            comparison_data = []
+
+            # 获取当前月份数据
+            current_date = datetime.now()
+            first_day = current_date.replace(day=1)
+            
+            current_data = db.query(SoybeanImportDB)\
+                .filter(SoybeanImportDB.date >= first_day)\
+                .order_by(SoybeanImportDB.date.desc())\
+                .first()
+            
+            if current_data:
+                comparison_data.append(
+                    ComparisonData(
+                        month=current_data.date.strftime('%Y-%m'),
+                        value=current_data.current_shipment,
+                        type="实际装船量"
+                    )
+                )
+
+            # 获取预测到港数据
+            next_month = current_date.replace(day=1) + timedelta(days=32)
+            next_month_start = next_month.replace(day=1)
+            
+            forecast_data = db.query(SoybeanImportDB)\
+                .filter(SoybeanImportDB.date >= next_month_start)\
+                .order_by(SoybeanImportDB.date.asc())\
+                .first()
+            
+            if forecast_data:
+                comparison_data.append(
+                    ComparisonData(
+                        month=forecast_data.date.strftime('%Y-%m'),
+                        value=forecast_data.forecast_arrival,
+                        type="预报到港量"
+                    )
+                )
+
+            # 获取同比数据
+            last_year = current_date.year - 1
+            yoy_data = db.query(SoybeanImportDB)\
+                .filter(
+                    SoybeanImportDB.date.between(
+                        datetime(last_year, 1, 1),
+                        datetime(last_year, 12, 31)
+                    )
+                )\
+                .order_by(SoybeanImportDB.date.asc())\
+                .all()
+            
+            for data in yoy_data:
+                comparison_data.append(
+                    ComparisonData(
+                        month=data.date.strftime('%Y-%m'),
+                        value=data.current_shipment,
+                        type="实际装船量"
+                    )
+                )
+
+            return comparison_data
+
+        except Exception as e:
+            logger.error(f"获取月度对比数据失败: {str(e)}")
+            return []
+        finally:
+            if db:
+                try:
+                    db.close()
+                except Exception as e:
+                    logger.error(f"关闭数据库连接失败: {str(e)}") 

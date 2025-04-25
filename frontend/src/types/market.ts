@@ -75,6 +75,7 @@ export interface InventoryData {
   value: number;
   mom_change: number;
   yoy_change: number;
+  data_type: 'inventory' | 'warehouse_receipts';
 }
 
 export interface InventoryResponse {

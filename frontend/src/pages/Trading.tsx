@@ -77,7 +77,7 @@ const Trading: React.FC = () => {
           </p>
         </div>
 
-        <StrategyCard
+        {/* <StrategyCard
           title="豆粕支撑阻力策略"
           tags={[
             { text: "技术面策略", color: "text-blue-800 bg-blue-100" },
@@ -87,7 +87,7 @@ const Trading: React.FC = () => {
           icon={<ChartBarIcon />}
         >
           <SupportResistanceStrategy />
-        </StrategyCard>
+        </StrategyCard> */}
 
         <StrategyCard
           title="豆粕近远月套利策略"

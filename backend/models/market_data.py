@@ -60,6 +60,7 @@ class InventoryData(BaseModel):
     value: float
     mom_change: float  # 环比变化
     yoy_change: float  # 同比变化
+    data_type: str = Field(description="数据类型：'inventory' 或 'warehouse_receipts'")  # 数据类型，区分库存和仓单
 
 class TechnicalIndicators(BaseModel):
     contract: str

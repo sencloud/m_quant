@@ -512,12 +512,12 @@ const KLineChart = React.forwardRef<any, KLineChartProps>((props, ref) => {
         return false;
     };
 
-    // 只在交易时间内每10秒刷新一次数据
+    // 只在交易时间内每60秒刷新一次数据
     const timer = setInterval(() => {
         if (isTradeTime()) {
             fetchData();
         }
-      }, 10000);
+      }, 60000);
 
     return () => {
       clearInterval(timer);

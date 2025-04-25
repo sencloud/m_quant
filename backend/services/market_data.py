@@ -586,9 +586,9 @@ class MarketDataService:
             return []
 
     def get_futures_inventory(self) -> Dict:
-        """获取豆粕库存数据"""
+        """获取豆粕库存数据和仓单数据"""
         try:
-            logger.info("开始获取豆粕库存数据")
+            logger.info("开始获取豆粕库存和仓单数据")
             # 使用akshare获取豆粕库存数据
             df = ak.futures_inventory_em(symbol='豆粕')
             
@@ -601,25 +601,103 @@ class MarketDataService:
             
             # 处理历史数据
             history_data = []
-            for _, row in df.tail(10).iterrows():  # 只取最近10条数据
+            for _, row in df.tail(60).iterrows():  # 只取最近60条数据
                 history_data.append({
                     "date": row['日期'],
                     "inventory": int(row['库存'])
                 })
+
+            # 获取仓单数据
+            end_date = datetime.now().strftime('%Y%m%d')
+            start_date = datetime(datetime.now().year - 1, 1, 1).strftime('%Y%m%d')
             
+            # 分批获取仓单数据，每次最多获取1000条
+            warehouse_receipts_dfs = []
+            current_end_date = end_date
+            current_start_date = start_date
+            
+            while True:
+                # 调用tushare API获取仓单数据
+                temp_df = self._call_tushare_api(
+                    self.pro.fut_wsr,
+                    symbol='M',  # 豆粕期货代码
+                    start_date=current_start_date,
+                    end_date=current_end_date,
+                    exchange='DCE'  # 大商所
+                )
+                
+                if temp_df is None or temp_df.empty:
+                    break
+                
+                warehouse_receipts_dfs.append(temp_df)
+                logger.info(f"获取仓单数据批次，时间范围：{current_start_date}至{current_end_date}，获取{len(temp_df)}条记录")
+                
+                # 如果获取的数据少于1000条，说明已经获取完毕
+                if len(temp_df) < 1000:
+                    break
+                
+                # 更新日期范围，向前推进
+                current_end_date = (datetime.strptime(temp_df['trade_date'].min(), '%Y%m%d') - timedelta(days=1)).strftime('%Y%m%d')
+                
+                # 如果已经超出了我们想要的时间范围，就停止
+                if current_end_date < start_date:
+                    break
+            
+            # 合并所有获取的数据
+            warehouse_receipts_df = pd.concat(warehouse_receipts_dfs) if warehouse_receipts_dfs else pd.DataFrame()
+            
+            logger.info(f"成功获取仓单数据，共{len(warehouse_receipts_df)}条记录")
+
+            # 处理仓单数据
+            warehouse_data = []
+            total_receipts = 0
+            if warehouse_receipts_df is not None and not warehouse_receipts_df.empty:
+                # 按日期分组，计算每天的总仓单量
+                daily_receipts = warehouse_receipts_df.groupby('trade_date').agg({
+                    'vol': 'sum',
+                    'vol_chg': 'sum',
+                    'pre_vol': 'sum'
+                }).reset_index()
+
+                # 获取最新的总仓单量
+                if not daily_receipts.empty:
+                    total_receipts = int(daily_receipts.iloc[-1]['vol'])
+
+                # 获取每个仓库的最新数据
+                latest_by_warehouse = warehouse_receipts_df.sort_values('trade_date').groupby('warehouse').last()
+                
+                # 处理每个仓库的数据
+                for warehouse, data in latest_by_warehouse.iterrows():
+                    warehouse_data.append({
+                        "warehouse": warehouse,
+                        "volume": int(data['vol']),
+                        "change": int(data['vol_chg']),
+                        "area": data['area'] if 'area' in data else "",
+                        "unit": data['unit'] if 'unit' in data else "吨"
+                    })
+
+                # 处理历史仓单数据
+                for _, row in daily_receipts.iterrows():
+                    history_data.append({
+                        "date": row['trade_date'],
+                        "warehouse_receipts": int(row['vol'])
+                    })
+
             result = {
                 "total_inventory": int(latest_data['库存']),
                 "warehouse_inventory": int(latest_data['库存'] * 0.6),  # 假设仓库库存占总库存60%
                 "port_inventory": int(latest_data['库存'] * 0.4),  # 假设港口库存占总库存40%
+                "total_warehouse_receipts": total_receipts,
                 "update_date": latest_data['日期'],
-                "history_data": history_data
+                "warehouse_data": warehouse_data,  # 各仓库的仓单数据
+                "history_data": history_data,  # 包含库存和仓单的历史数据
+                "last_updated": datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             }
             
-            logger.info(f"成功获取豆粕库存数据: {result}")
             return result
             
         except Exception as e:
-            logger.error(f"获取库存数据失败: {str(e)}")
+            logger.error(f"获取库存和仓单数据失败: {str(e)}")
             import traceback
             traceback.print_exc()
             return {}

@@ -143,7 +143,7 @@ const MarketView: React.FC = () => {
                 <Statistic
                   title="最新价"
                   value={marketData.price}
-                  precision={2}
+                  precision={0}
                   valueStyle={{ color: marketData.change >= 0 ? '#cf1322' : '#3f8600' }}
                   prefix={marketData.change >= 0 ? <ArrowUpOutlined /> : <ArrowDownOutlined />}
                   suffix="元"

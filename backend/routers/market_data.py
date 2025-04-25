@@ -5,7 +5,7 @@ from services.market_data import MarketDataService
 from services.opt_service import OptService
 from models.market_data import FuturesData, ETFData, OptionsData, InventoryData, TechnicalIndicators, OptionsHedgeData, OptionBasic, OptionDaily, CostComparisonData, PriceRangeAnalysis
 from utils.logger import logger
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 import pandas as pd
 import numpy as np
 from pathlib import Path
@@ -123,27 +123,130 @@ async def get_inventory_data(
         # 转换数据格式
         inventory_list = []
         history_data = data.get("history_data", [])
-        for i, item in enumerate(history_data):
-            # 计算环比和同比变化
-            current_value = item["inventory"]
-            previous_value = history_data[i-1]["inventory"] if i > 0 else current_value
-            last_year_value = data.get("history_data", [])[12]["inventory"] if len(data.get("history_data", [])) > 12 else current_value
-            
-            # mom_change改为直接相减
-            mom_change = current_value - previous_value
-            yoy_change = ((current_value - last_year_value) / last_year_value * 100) if last_year_value != 0 else 0
-            
-            inventory_list.append(InventoryData(
-                date=item["date"].strftime('%Y-%m-%d'),
-                value=float(current_value),
-                mom_change=float(mom_change),
-                yoy_change=float(yoy_change)
-            ))
         
-        logger.info(f"成功返回库存数据，共{len(inventory_list)}条记录")
+        # 创建一个按日期索引的字典来分别存储库存和仓单数据
+        date_data = {}
+        for item in history_data:
+            date_value = item.get("date")
+            if not date_value:
+                continue
+                
+            # 统一日期格式为字符串
+            try:
+                # 尝试将日期转换为标准格式
+                if isinstance(date_value, (date, datetime)):
+                    date_str = date_value.strftime('%Y-%m-%d')
+                elif isinstance(date_value, str):
+                    # 如果是YYYYMMDD格式的字符串
+                    if len(date_value) == 8 and date_value.isdigit():
+                        date_str = f"{date_value[:4]}-{date_value[4:6]}-{date_value[6:]}"
+                    else:
+                        # 尝试解析其他格式的日期字符串
+                        date_str = datetime.strptime(date_value, '%Y-%m-%d').strftime('%Y-%m-%d')
+                else:
+                    logger.warning(f"跳过无效的日期格式: {date_value}")
+                    continue
+            except Exception as e:
+                logger.warning(f"日期格式转换失败: {date_value}, 错误: {str(e)}")
+                continue
+            
+            if date_str not in date_data:
+                date_data[date_str] = {
+                    "date": date_str,
+                    "inventory": None,
+                    "warehouse_receipts": None
+                }
+            
+            # 分别更新库存和仓单数据
+            if "inventory" in item:
+                date_data[date_str]["inventory"] = item["inventory"]
+            if "warehouse_receipts" in item:
+                date_data[date_str]["warehouse_receipts"] = item["warehouse_receipts"]
+        
+        # 按日期排序
+        sorted_dates = sorted(date_data.keys())
+        
+        # 生成最终的数据列表
+        for date_str in sorted_dates:
+            item_data = date_data[date_str]
+            
+            # 处理库存数据
+            if item_data["inventory"] is not None:
+                current_value = item_data["inventory"]
+                
+                # 找到前一天的库存数据
+                prev_idx = sorted_dates.index(date_str) - 1
+                if prev_idx >= 0:
+                    prev_date = sorted_dates[prev_idx]
+                    prev_data = date_data[prev_date]
+                    previous_value = prev_data["inventory"] if prev_data["inventory"] is not None else current_value
+                else:
+                    previous_value = current_value
+                
+                # 找到去年同期的库存数据
+                year_ago_idx = max(0, sorted_dates.index(date_str) - 365)
+                if year_ago_idx < len(sorted_dates):
+                    last_year_date = sorted_dates[year_ago_idx]
+                    last_year_data = date_data[last_year_date]
+                    last_year_value = last_year_data["inventory"] if last_year_data["inventory"] is not None else current_value
+                else:
+                    last_year_value = current_value
+                
+                # mom_change改为直接相减
+                mom_change = current_value - previous_value
+                yoy_change = ((current_value - last_year_value) / last_year_value * 100) if last_year_value != 0 else 0
+                
+                inventory_list.append(InventoryData(
+                    date=date_str,
+                    value=float(current_value),
+                    mom_change=float(mom_change),
+                    yoy_change=float(yoy_change),
+                    data_type="inventory"
+                ))
+            
+            # 处理仓单数据
+            if item_data["warehouse_receipts"] is not None:
+                current_value = item_data["warehouse_receipts"]
+                
+                # 找到前一天的仓单数据
+                prev_idx = sorted_dates.index(date_str) - 1
+                if prev_idx >= 0:
+                    prev_date = sorted_dates[prev_idx]
+                    prev_data = date_data[prev_date]
+                    previous_value = prev_data["warehouse_receipts"] if prev_data["warehouse_receipts"] is not None else current_value
+                else:
+                    previous_value = current_value
+                
+                # 找到去年同期的仓单数据
+                year_ago_idx = max(0, sorted_dates.index(date_str) - 365)
+                if year_ago_idx < len(sorted_dates):
+                    last_year_date = sorted_dates[year_ago_idx]
+                    last_year_data = date_data[last_year_date]
+                    last_year_value = last_year_data["warehouse_receipts"] if last_year_data["warehouse_receipts"] is not None else current_value
+                else:
+                    last_year_value = current_value
+                
+                # mom_change改为直接相减
+                mom_change = current_value - previous_value
+                yoy_change = ((current_value - last_year_value) / last_year_value * 100) if last_year_value != 0 else 0
+                
+                inventory_list.append(InventoryData(
+                    date=date_str,
+                    value=float(current_value),
+                    mom_change=float(mom_change),
+                    yoy_change=float(yoy_change),
+                    data_type="warehouse_receipts"
+                ))
+        
+        # 按日期排序
+        inventory_list.sort(key=lambda x: x.date)
+        
+        logger.info(f"成功返回库存和仓单数据，共{len(inventory_list)}条记录")
         return inventory_list
     except Exception as e:
-        logger.error(f"库存数据请求失败: {str(e)}")
+        logger.error(f"库存和仓单数据请求失败: {str(e)}")
+        import traceback
+        logger.error(traceback.format_exc())
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/technical", response_model=TechnicalIndicators)
