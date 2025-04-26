@@ -28,18 +28,18 @@ const Header: React.FC = () => {
         </Link>
       ),
     },
-    {
-      key: 'stock-futures',
-      label: (
-        <Link to="/pro/stock-futures" className="flex items-center py-2 px-4 hover:bg-gray-50">
-          <CrownOutlined className="mr-3 text-orange-500 text-xl" />
-          <div>
-            <div className="font-medium">期股联动</div>
-            <div className="text-xs text-gray-500">豆粕期货与相关股票联动分析</div>
-          </div>
-        </Link>
-      ),
-    },
+    // {
+    //   key: 'stock-futures',
+    //   label: (
+    //     <Link to="/pro/stock-futures" className="flex items-center py-2 px-4 hover:bg-gray-50">
+    //       <CrownOutlined className="mr-3 text-orange-500 text-xl" />
+    //       <div>
+    //         <div className="font-medium">期股联动</div>
+    //         <div className="text-xs text-gray-500">豆粕期货与相关股票联动分析</div>
+    //       </div>
+    //     </Link>
+    //   ),
+    // },
     {
       key: 'multi-variety-arbitrage',
       label: (
@@ -56,7 +56,7 @@ const Header: React.FC = () => {
       key: 'soybean-import',
       label: (
         <Link to="/pro/soybean-import" className="flex items-center py-2 px-4 hover:bg-gray-50">
-          <BarChartOutlined className="mr-3 text-blue-500 text-xl" />
+          <BarChartOutlined className="mr-3 text-yellow-500 text-xl" />
           <div>
             <div className="font-medium">大豆进口分析</div>
             <div className="text-xs text-gray-500">进口数据深度分析与预测</div>
@@ -302,7 +302,7 @@ const Header: React.FC = () => {
                   <div className="text-xs text-gray-500">基于历史数据的深度分析</div>
                 </div>
               </NavLink>
-              <NavLink
+              {/* <NavLink
                 to="/pro/stock-futures"
                 className="flex items-center py-2 px-4 hover:bg-gray-50 rounded-md"
                 onClick={() => setIsMenuOpen(false)}
@@ -312,7 +312,7 @@ const Header: React.FC = () => {
                   <div className="font-medium">期股联动</div>
                   <div className="text-xs text-gray-500">豆粕期货与相关股票联动分析</div>
                 </div>
-              </NavLink>
+              </NavLink> */}
               <NavLink
                 to="/news-analysis"
                 className="flex items-center py-2 px-4 hover:bg-gray-50 rounded-md"
@@ -322,6 +322,17 @@ const Header: React.FC = () => {
                 <div>
                   <div className="font-medium">消息面分析</div>
                   <div className="text-xs text-gray-500">从宏观、行业等角度分析消息面</div>
+                </div>
+              </NavLink>
+              <NavLink
+                to="/pro/soybean-import"
+                className="flex items-center py-2 px-4 hover:bg-gray-50 rounded-md"
+                onClick={() => setIsMenuOpen(false)}
+              >
+                <CrownOutlined className="mr-3 text-orange-500 text-xl" />
+                <div>
+                  <div className="font-medium">大豆进口分析</div>
+                  <div className="text-xs text-gray-500">进口数据深度分析与预测</div>
                 </div>
               </NavLink>
               <NavLink
