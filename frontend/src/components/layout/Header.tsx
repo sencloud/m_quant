@@ -157,9 +157,9 @@ const Header: React.FC = () => {
 
           {/* Desktop Navigation */}
           <nav className="hidden md:flex space-x-8">
-            <NavLink to="/signals" className={getNavLinkClass}>
+            {/* <NavLink to="/signals" className={getNavLinkClass}>
               信号
-            </NavLink>
+            </NavLink> */}
             <NavLink to="/market" className={getNavLinkClass}>
               操盘
             </NavLink>
@@ -224,13 +224,13 @@ const Header: React.FC = () => {
       {/* Mobile menu panel */}
       <div className={`${isMenuOpen ? 'block' : 'hidden'} md:hidden`}>
         <div className="px-2 pt-2 pb-3 space-y-1">
-          <NavLink
+          {/* <NavLink
             to="/signals"
             className={getNavLinkClass}
             onClick={() => setIsMenuOpen(false)}
           >
             信号
-          </NavLink>
+          </NavLink> */}
           <NavLink
             to="/market"
             className={getNavLinkClass}

@@ -263,6 +263,7 @@ const MultiVarietyArbitrage: React.FC = () => {
               <Statistic
                 title="历史均值"
                 value={historicalAverage}
+                precision={3}
                 prefix="¥"
                 suffix="/吨"
               />
@@ -389,7 +390,7 @@ const MultiVarietyArbitrage: React.FC = () => {
                       <Statistic
                         title="历史均值"
                         value={historicalAverage}
-                        precision={0}
+                        precision={2}
                         prefix="¥"
                         suffix="/吨"
                       />

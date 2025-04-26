@@ -345,18 +345,19 @@ def main():
         </p>
         
         <h4 className="text-md font-medium text-gray-900 mt-4">交易逻辑</h4>
+        
         <ul className="list-disc pl-5 text-gray-600">
           <li>价差计算：近月合约价格 - 远月合约价格</li>
-          <li>正套：当价差Z分数大于{stdMultiplier}时，做空远月合约，做多近月合约</li>
-          <li>反套：当价差Z分数小于-{stdMultiplier}时，做多远月合约，做空近月合约</li>
+          <li>正套（做空价差）：当价差Z分数 大于{stdMultiplier}或价差高估，卖出近月合约 + 买入远月合约。</li>
+          <li>反套（做多价差）：当价差Z分数 小于-{stdMultiplier}或价差低估，买入近月合约 + 卖出远月合约。</li>
         </ul>
 
         <h4 className="text-md font-medium text-gray-900 mt-4">止盈止损</h4>
         <ul className="list-disc pl-5 text-gray-600">
-          <li>正套止盈：价差Z分数回归到0</li>
-          <li>正套止损：价差Z分数继续扩大到{stdMultiplier + 1}</li>
-          <li>反套止盈：价差Z分数回归到0</li>
-          <li>反套止损：价差Z分数继续扩大到-{stdMultiplier + 1}</li>
+          <li>正套止盈：价差Z分数回归至0或固定点位。</li>
+          <li>正套止损：价差Z分数 大于{stdMultiplier + 1}或固定止损。</li>
+          <li>反套止盈：价差Z分数回归至0或固定点位。</li>
+          <li>反套止损：价差Z分数 小于-{stdMultiplier + 1}或固定止损。</li>
         </ul>
 
         <div className="mt-4 space-y-4">

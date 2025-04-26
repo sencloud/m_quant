@@ -55,7 +55,7 @@ const Research: React.FC = () => {
             </div>
           </Link>
 
-          {/* 期权策略分析卡片 */}
+          {/* 基本面分析卡片 */}
           <Link to="/research/options-strategy" className="block">
             <div className="bg-white overflow-hidden shadow rounded-lg hover:shadow-md transition-shadow duration-300">
               <div className="p-6">
@@ -64,9 +64,9 @@ const Research: React.FC = () => {
                     <FundOutlined className="h-6 w-6 text-white" />
                   </div>
                   <div className="ml-5">
-                    <h3 className="text-lg font-medium text-gray-900">期权策略分析</h3>
+                    <h3 className="text-lg font-medium text-gray-900">基本面分析</h3>
                     <p className="mt-1 text-sm text-gray-500">
-                      基于基本面的豆粕期权策略分析
+                      基于基本面的豆粕策略分析
                     </p>
                   </div>
                 </div>

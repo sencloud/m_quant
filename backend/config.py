@@ -3,7 +3,7 @@ from functools import lru_cache
 
 class Settings(BaseSettings):
     # Tushare API配置
-    TUSHARE_TOKEN: str
+    TUSHARE_TOKEN: str = "你的tushare token"
     
     # Deepseek API配置
     DEEPSEEK_API_KEY: str

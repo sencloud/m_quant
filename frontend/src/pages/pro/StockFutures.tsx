@@ -560,6 +560,22 @@ const StockFutures: React.FC = () => {
           <div className="border-b border-gray-200">
             <nav className="-mb-px flex space-x-8">
               <button
+                onClick={() => setActiveTab('strategy')}
+                className={`
+                  py-4 px-1 border-b-2 font-medium text-sm
+                  ${activeTab === 'strategy'
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}
+                `}
+              >
+                <span className="flex items-center">
+                  <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                  </svg>
+                  策略说明
+                </span>
+              </button>
+              <button
                 onClick={() => setActiveTab('overview')}
                 className={`
                   py-4 px-1 border-b-2 font-medium text-sm
@@ -674,6 +690,50 @@ const StockFutures: React.FC = () => {
 
                 <div className="bg-white rounded-lg shadow p-6">
                   <CompanyDetail company={selectedCompany} />
+                </div>
+              </div>
+            ) : activeTab === 'strategy' ? (
+              <div className="bg-white rounded-lg shadow p-6">
+                <div className="prose max-w-none">
+                  <h2 className="text-2xl font-bold mb-6">策略说明</h2>
+                  <p className="text-gray-600">本策略通过监测豆粕期货与相关股票的价格联动，捕捉产业链利润传导、市场预期差及跨市场套利机会，形成3-6个月的中长期配置。</p>
+                  
+                  <h3 className="text-xl font-semibold mt-8 mb-4">核心逻辑</h3>
+                  <ul className="space-y-2 text-gray-600">
+                    <li><strong>产业链利润传导</strong>：豆粕期货价格变动 → 影响上下游企业利润 → 驱动股价波动</li>
+                    <li><strong>跨市场预期差</strong>：期货市场反映商品供需，股票市场反映企业盈利，两者背离时存在套利空间</li>
+                    <li><strong>周期共振</strong>：结合养殖周期、种植周期与政策周期，预判联动趋势</li>
+                  </ul>
+
+                  <h3 className="text-xl font-semibold mt-8 mb-4">信号类型</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div className="bg-gray-50 p-4 rounded-lg">
+                      <h4 className="text-lg font-semibold text-gray-900">1. 正向联动信号</h4>
+                      <ul className="mt-2 space-y-2 text-gray-600">
+                        <li>豆粕期货连续3个月上涨，且基差从贴水转为升水</li>
+                        <li>上游压榨企业PB分位数低于历史30%</li>
+                        <li>操作建议：做多豆粕期货 + 做多压榨企业股票</li>
+                      </ul>
+                    </div>
+
+                    <div className="bg-gray-50 p-4 rounded-lg">
+                      <h4 className="text-lg font-semibold text-gray-900">2. 反向联动信号</h4>
+                      <ul className="mt-2 space-y-2 text-gray-600">
+                        <li>豆粕期货跌幅 {'>'} 15%（3个月内），且生猪存栏量环比回升</li>
+                        <li>下游养殖企业PE低于历史10%</li>
+                        <li>操作建议：做空豆粕期货 + 做多养殖企业股票</li>
+                      </ul>
+                    </div>
+
+                    <div className="bg-gray-50 p-4 rounded-lg">
+                      <h4 className="text-lg font-semibold text-gray-900">3. 跨市场套利信号</h4>
+                      <ul className="mt-2 space-y-2 text-gray-600">
+                        <li>压榨利润 {'>'} 500元/吨，且压榨企业股价未同步上涨</li>
+                        <li>期货价格与股票指数60日相关系数 {'<'} -0.3</li>
+                        <li>操作建议：做多压榨企业股票 + 做空豆粕期货</li>
+                      </ul>
+                    </div>
+                  </div>
                 </div>
               </div>
             ) : activeTab === 'signals' ? (
@@ -841,51 +901,6 @@ const StockFutures: React.FC = () => {
           </div>
         </div>
 
-        <hr className="my-12 border-gray-200" />
-        
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="prose max-w-none">
-            <h2 className="text-2xl font-bold mb-6">策略说明</h2>
-            <p className="text-gray-600">本策略通过监测豆粕期货与相关股票的价格联动，捕捉产业链利润传导、市场预期差及跨市场套利机会，形成3-6个月的中长期配置。</p>
-            
-            <h3 className="text-xl font-semibold mt-8 mb-4">核心逻辑</h3>
-            <ul className="space-y-2 text-gray-600">
-              <li><strong>产业链利润传导</strong>：豆粕期货价格变动 → 影响上下游企业利润 → 驱动股价波动</li>
-              <li><strong>跨市场预期差</strong>：期货市场反映商品供需，股票市场反映企业盈利，两者背离时存在套利空间</li>
-              <li><strong>周期共振</strong>：结合养殖周期、种植周期与政策周期，预判联动趋势</li>
-            </ul>
-
-            <h3 className="text-xl font-semibold mt-8 mb-4">信号类型</h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="bg-gray-50 p-4 rounded-lg">
-                <h4 className="text-lg font-semibold text-gray-900">1. 正向联动信号</h4>
-                <ul className="mt-2 space-y-2 text-gray-600">
-                  <li>豆粕期货连续3个月上涨，且基差从贴水转为升水</li>
-                  <li>上游压榨企业PB分位数低于历史30%</li>
-                  <li>操作建议：做多豆粕期货 + 做多压榨企业股票</li>
-                </ul>
-              </div>
-
-              <div className="bg-gray-50 p-4 rounded-lg">
-                <h4 className="text-lg font-semibold text-gray-900">2. 反向联动信号</h4>
-                <ul className="mt-2 space-y-2 text-gray-600">
-                  <li>豆粕期货跌幅 {'>'} 15%（3个月内），且生猪存栏量环比回升</li>
-                  <li>下游养殖企业PE低于历史10%</li>
-                  <li>操作建议：做空豆粕期货 + 做多养殖企业股票</li>
-                </ul>
-              </div>
-
-              <div className="bg-gray-50 p-4 rounded-lg">
-                <h4 className="text-lg font-semibold text-gray-900">3. 跨市场套利信号</h4>
-                <ul className="mt-2 space-y-2 text-gray-600">
-                  <li>压榨利润 {'>'} 500元/吨，且压榨企业股价未同步上涨</li>
-                  <li>期货价格与股票指数60日相关系数 {'<'} -0.3</li>
-                  <li>操作建议：做多压榨企业股票 + 做空豆粕期货</li>
-                </ul>
-              </div>
-            </div>
-          </div>
-        </div>
       </div>
     </Layout>
   );

@@ -57,8 +57,7 @@ class MarketDataService:
                 logger.error("未找到 TUSHARE_TOKEN，请在 .env 文件中设置")
                 self.pro = None
             else:
-                ts.set_token(token)
-                self.pro = ts.pro_api()
+                self.pro = ts.pro_api(token=settings.TUSHARE_TOKEN) 
                 self.logger = logger
                 logger.debug("Tushare API初始化完成")
                 

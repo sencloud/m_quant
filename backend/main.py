@@ -144,6 +144,11 @@ async def startup_event():
     logger.info(f"项目名称: {settings.PROJECT_NAME}")
     logger.info(f"API版本: {settings.API_V1_STR}")
 
+    # 检查 Tushare Token
+    if not settings.TUSHARE_TOKEN:
+        logger.error("Tushare token not configured")
+        sys.exit(1)
+
 @app.on_event("shutdown")
 async def shutdown_event():
     logger.info("应用关闭")

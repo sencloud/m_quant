@@ -33,8 +33,20 @@ const SkeletonCard = () => (
   </div>
 );
 
+const NumberTransition: React.FC<{
+  value: number;
+  precision?: number;
+  prefix?: string;
+  className?: string;
+}> = ({ value, precision = 2, prefix = '', className = '' }) => {
+  return (
+    <span className={`transition-all duration-300 ease-out ${className}`}>
+      {prefix}{value.toFixed(precision)}
+    </span>
+  );
+};
+
 const MarketView: React.FC = () => {
-  const [loading, setLoading] = useState(false);
   const [strategy, setStrategy] = useState<string>('');
   const [streamingStrategy, setStreamingStrategy] = useState<string>('');
   const chartRef = useRef<any>(null);
@@ -55,7 +67,6 @@ const MarketView: React.FC = () => {
 
   // 获取实时行情数据
   const fetchMarketData = async () => {
-    setLoading(true);
     try {
       const response = await axios.get(`${API_BASE_URL}/market/realtime`);
       setMarketData(response.data);
@@ -65,8 +76,6 @@ const MarketView: React.FC = () => {
         message: '获取行情数据失败',
         type: 'error'
       });
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -142,49 +151,37 @@ const MarketView: React.FC = () => {
         </div>
 
         <div className="mb-8">
-          {loading ? (
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <SkeletonCard />
-              <SkeletonCard />
-              <SkeletonCard />
-              <SkeletonCard />
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="bg-gray-50 p-4 rounded-lg">
+              <p className="text-sm text-gray-500">最新价</p>
+              <p className={`text-2xl font-bold ${marketData.change >= 0 ? 'text-red-600' : 'text-green-600'}`}>
+                ¥{marketData.price.toFixed(2)}
+              </p>
             </div>
-          ) : (
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="bg-gray-50 p-4 rounded-lg">
-                <p className="text-sm text-gray-500">最新价</p>
-                <p className={`text-2xl font-bold ${marketData.change >= 0 ? 'text-red-600' : 'text-green-600'}`}>
-                  ¥{marketData.price.toFixed(2)}
-                </p>
-              </div>
-              <div className="bg-gray-50 p-4 rounded-lg">
-                <p className="text-sm text-gray-500">涨跌幅</p>
-                <p className={`text-2xl font-bold ${marketData.change >= 0 ? 'text-red-600' : 'text-green-600'}`}>
-                  {marketData.changePercent.toFixed(2)}%
-                </p>
-              </div>
-              <div className="bg-gray-50 p-4 rounded-lg">
-                <p className="text-sm text-gray-500">成交量</p>
-                <p className="text-2xl font-bold text-gray-900">
-                  {marketData.volume.toLocaleString()}
-                </p>
-              </div>
-              <div className="bg-gray-50 p-4 rounded-lg">
-                <p className="text-sm text-gray-500">持仓量</p>
-                <p className="text-2xl font-bold text-gray-900">
-                  {marketData.openInterest.toLocaleString()}
-                </p>
-              </div>
+            <div className="bg-gray-50 p-4 rounded-lg">
+              <p className="text-sm text-gray-500">涨跌幅</p>
+              <p className={`text-2xl font-bold ${marketData.change >= 0 ? 'text-red-600' : 'text-green-600'}`}>
+                {marketData.changePercent.toFixed(2)}%
+              </p>
             </div>
-          )}
+            <div className="bg-gray-50 p-4 rounded-lg">
+              <p className="text-sm text-gray-500">成交量</p>
+              <p className="text-2xl font-bold text-gray-900">
+                {marketData.volume.toLocaleString()}
+              </p>
+            </div>
+            <div className="bg-gray-50 p-4 rounded-lg">
+              <p className="text-sm text-gray-500">持仓量</p>
+              <p className="text-2xl font-bold text-gray-900">
+                {marketData.openInterest.toLocaleString()}
+              </p>
+            </div>
+          </div>
         </div>
 
         <div className="bg-white rounded-lg p-6 mb-8">
           <div className="flex justify-between items-center mb-6">
             <h2 className="text-2xl font-bold text-gray-900">豆粕2509合约行情</h2>
-            {loading && (
-              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-900"></div>
-            )}
           </div>
           <div>
             <KLineChart ref={chartRef} />
@@ -193,96 +190,89 @@ const MarketView: React.FC = () => {
 
         <div className="bg-white rounded-lg p-6">
           <div className="flex justify-between items-center mb-6">
-            <h2 className="text-2xl font-bold text-gray-900">操盘策略（DeepSeek提示）</h2>
-            <div className="flex items-center gap-4">
-              {loading && (
-                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-900"></div>
-              )}
-              <button 
-                className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition duration-150 ease-in-out"
-                onClick={async () => {
-                  try {
-                    setLoading(true);
-                    setStreamingStrategy('');
-                    setStrategy('');
-                    
-                    cleanupEventSource();
+            <h2 className="text-2xl font-bold text-gray-900">操盘策略（by DeepSeek）</h2>
+          </div>
+          <div className="flex items-center gap-4">
+            <button 
+              className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition duration-150 ease-in-out"
+              onClick={async () => {
+                try {
+                  setStreamingStrategy('');
+                  setStrategy('');
+                  
+                  cleanupEventSource();
 
-                    const chartInstance = chartRef.current?.getEchartsInstance();
-                    const option = chartInstance?.getOption();
-                    const markLines = option?.series[0]?.markLine?.data || [];
-                    
-                    const sr_levels = markLines.map((line: any) => ({
-                      price: Number(line[0].coord[1]),
-                      type: line[0].name === 'Support' ? 'Support' : 'Resistance',
-                      strength: Number(line[0].lineStyle.width),
-                      start_time: option.xAxis[0].data[line[0].coord[0]],
-                      break_time: line[1].coord ? option.xAxis[0].data[line[1].coord[0]] : null,
-                      retest_times: [],
-                      timeframe: '30m'
-                    }));
+                  const chartInstance = chartRef.current?.getEchartsInstance();
+                  const option = chartInstance?.getOption();
+                  const markLines = option?.series[0]?.markLine?.data || [];
+                  
+                  const sr_levels = markLines.map((line: any) => ({
+                    price: Number(line[0].coord[1]),
+                    type: line[0].name === 'Support' ? 'Support' : 'Resistance',
+                    strength: Number(line[0].lineStyle.width),
+                    start_time: option.xAxis[0].data[line[0].coord[0]],
+                    break_time: line[1].coord ? option.xAxis[0].data[line[1].coord[0]] : null,
+                    retest_times: [],
+                    timeframe: '30m'
+                  }));
 
-                    const response = await fetch(`${API_BASE_URL}/market/strategy`, {
-                      method: 'POST',
-                      headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': 'text/event-stream',
-                      },
-                      body: JSON.stringify({ sr_levels }),
-                    });
+                  const response = await fetch(`${API_BASE_URL}/market/strategy`, {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json',
+                      'Accept': 'text/event-stream',
+                    },
+                    body: JSON.stringify({ sr_levels }),
+                  });
 
-                    if (!response.ok) {
-                      throw new Error('Strategy request failed');
+                  if (!response.ok) {
+                    throw new Error('Strategy request failed');
+                  }
+
+                  const reader = response.body?.getReader();
+                  const decoder = new TextDecoder();
+
+                  if (!reader) {
+                    throw new Error('Failed to create stream reader');
+                  }
+
+                  while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) {
+                      break;
                     }
 
-                    const reader = response.body?.getReader();
-                    const decoder = new TextDecoder();
-
-                    if (!reader) {
-                      throw new Error('Failed to create stream reader');
-                    }
-
-                    while (true) {
-                      const { done, value } = await reader.read();
-                      if (done) {
-                        setLoading(false);
-                        break;
-                      }
-
-                      const text = decoder.decode(value);
-                      const lines = text.split('\n');
-                      
-                      for (const line of lines) {
-                        if (line.startsWith('data: ')) {
-                          try {
-                            const data = JSON.parse(line.slice(6));
-                            if (data.type === 'content') {
-                              setStreamingStrategy(prev => prev + data.content);
-                            } else if (data.type === 'done') {
-                              setStrategy(data.content);
-                              setLoading(false);
-                              reader.cancel();
-                              break;
-                            }
-                          } catch (error) {
-                            console.error('Error parsing SSE data:', error);
+                    const text = decoder.decode(value);
+                    const lines = text.split('\n');
+                    
+                    for (const line of lines) {
+                      if (line.startsWith('data: ')) {
+                        try {
+                          const data = JSON.parse(line.slice(6));
+                          if (data.type === 'content') {
+                            setStreamingStrategy(prev => prev + data.content);
+                          } else if (data.type === 'done') {
+                            setStrategy(data.content);
+                            reader.cancel();
+                            break;
                           }
+                        } catch (error) {
+                          console.error('Error parsing SSE data:', error);
                         }
                       }
                     }
-                  } catch (error) {
-                    console.error('获取策略失败:', error);
-                    setToast({
-                      message: '获取策略失败，请稍后重试',
-                      type: 'error'
-                    });
-                    setLoading(false);
                   }
-                }}
-              >
-                立即获取
-              </button>
-            </div>
+                } catch (error) {
+                  console.error('获取策略失败:', error);
+                  setToast({
+                    message: '获取策略失败，请稍后重试',
+                    type: 'error'
+                  });
+                }
+              }}
+            >
+              立即获取
+            </button>
           </div>
           {(streamingStrategy || strategy) && (
             <div className="prose max-w-none">
