@@ -16,6 +16,9 @@ from openai import OpenAI
 from config import settings
 from starlette.background import BackgroundTask
 from pydantic import BaseModel
+from models.trading_strategy import TradingStrategy
+from sqlalchemy.orm import Session
+from sqlalchemy import create_engine
 
 router = APIRouter()
 
@@ -24,6 +27,9 @@ client = OpenAI(
     api_key=settings.DEEPSEEK_API_KEY,
     base_url="https://ark.cn-beijing.volces.com/api/v3/bots"
 )
+
+# 创建数据库引擎
+engine = create_engine(settings.DATABASE_URL or "sqlite:///./trading.db")
 
 def get_market_data_service() -> MarketDataService:
     logger.debug("创建市场数据服务实例")
@@ -645,7 +651,7 @@ async def get_realtime_data(contract: str = "M2509"):
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e)) 
     
-async def stream_response(response, request: Request, next_day: str):
+async def stream_response(response, request: Request, strategy_id: int):
     last_content = ""
     
     try:
@@ -669,6 +675,16 @@ async def stream_response(response, request: Request, next_day: str):
                 logger.error(f"处理chunk时出错: {str(e)}")
                 continue
         
+        # 保存完整策略到数据库
+        try:
+            with Session(engine) as session:
+                strategy = session.query(TradingStrategy).get(strategy_id)
+                if strategy:
+                    strategy.strategy = last_content
+                    session.commit()
+        except Exception as e:
+            logger.error(f"保存策略到数据库失败: {str(e)}")
+        
         # 发送完成标记
         yield f"data: {json.dumps({'type': 'done', 'content': last_content})}\n\n"
         
@@ -690,6 +706,30 @@ class SRLevel(BaseModel):
 class StrategyRequest(BaseModel):
     sr_levels: List[SRLevel]
 
+@router.get("/strategy/{contract}")
+async def get_strategy(contract: str):
+    """获取操盘策略"""
+    logger.info(f"收到操盘策略请求 - 合约: {contract}")
+    try:
+        # 创建数据库会话
+        with Session(engine) as session:
+            # 获取最新的策略
+            strategy = session.query(TradingStrategy)\
+                .filter(TradingStrategy.contract == contract)\
+                .order_by(TradingStrategy.created_at.desc())\
+                .first()
+            
+            if not strategy:
+                return {"strategy": "", "sr_levels": []}
+            
+            return {
+                "strategy": strategy.strategy,
+                "sr_levels": strategy.sr_levels
+            }
+    except Exception as e:
+        logger.error(f"获取操盘策略失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 @router.post("/strategy")
 async def get_strategy(
     request: Request,
@@ -699,7 +739,15 @@ async def get_strategy(
     try:
         logger.info("开始调用Deepseek API")
         
-        prompt = f"""目标：基于豆粕2509合约行情数据分析得到的支撑阻力位数据分析给出操作策略，不要出现任何的引用和来源。
+        # 获取请求体
+        body = await request.json()
+        contract = body.get("contract")
+        sr_levels = body.get("sr_levels")
+
+        if not contract:
+            raise HTTPException(status_code=400, detail="缺少合约参数")
+        
+        prompt = f"""目标：基于豆粕{contract}合约行情数据分析得到的支撑阻力位数据分析给出操作策略，返回的文字中不要出现任何的引用、摘要字样以及来源。
                 支撑阻力位数据：
                 {strategy_request.sr_levels}
                 """
@@ -709,14 +757,26 @@ async def get_strategy(
             response = client.chat.completions.create(
                 model="bot-20250329163710-8zcqm",
                 messages=[
-                    {"role": "system", "content": "你是一个豆粕期货量化策略专家，请根据我给你的豆粕2509合约行情数据分析得到的支撑阻力位数据，分析给出操作建议。"},
+                    {"role": "system", "content": f"你是一个豆粕期货量化策略专家，请根据我给你的豆粕{contract}合约行情数据分析得到的支撑阻力位数据，分析给出操作建议。"},
                     {"role": "user", "content": prompt}
                 ],
                 stream=True
             )
 
+            # 创建数据库会话
+            with Session(engine) as session:
+                # 创建新策略
+                new_strategy = TradingStrategy(
+                    contract=contract,
+                    strategy="",  # 初始为空，等待流式响应完成后更新
+                    sr_levels=sr_levels
+                )
+                session.add(new_strategy)
+                session.commit()
+                strategy_id = new_strategy.id
+
             return StreamingResponse(
-                stream_response(response, request, ""),
+                stream_response(response, request, strategy_id),
                 media_type="text/event-stream",
                 background=BackgroundTask(logger.info, "请求处理完成")
             )

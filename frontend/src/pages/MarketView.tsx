@@ -96,9 +96,31 @@ const MarketView: React.FC = () => {
     }
   };
 
+  // 获取操盘策略
+  const fetchStrategy = async () => {
+    if (!selectedContract) return;
+    try {
+      const response = await axios.get(`${API_BASE_URL}/market/strategy/${selectedContract}`);
+      setStrategy(response.data.strategy);
+    } catch (error) {
+      console.error('获取操盘策略失败:', error);
+      setToast({
+        message: '获取操盘策略失败',
+        type: 'error'
+      });
+    }
+  };
+
   useEffect(() => {
     fetchContracts();
   }, []);
+
+  // 当合约变化时获取策略
+  useEffect(() => {
+    if (selectedContract) {
+      fetchStrategy();
+    }
+  }, [selectedContract]);
 
   // 获取实时行情数据
   const fetchMarketData = async () => {
@@ -247,7 +269,7 @@ const MarketView: React.FC = () => {
               </div>
               <div className="flex items-center gap-4">
                 <button 
-                  className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition duration-150 ease-in-out"
+                  className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition duration-150 ease-in-out mb-4"
                   onClick={async () => {
                     try {
                       setStreamingStrategy('');
@@ -275,7 +297,10 @@ const MarketView: React.FC = () => {
                           'Content-Type': 'application/json',
                           'Accept': 'text/event-stream',
                         },
-                        body: JSON.stringify({ sr_levels }),
+                        body: JSON.stringify({ 
+                          contract: selectedContract,
+                          sr_levels 
+                        }),
                       });
 
                       if (!response.ok) {
@@ -289,6 +314,7 @@ const MarketView: React.FC = () => {
                         throw new Error('Failed to create stream reader');
                       }
 
+                      let fullStrategy = '';
                       while (true) {
                         const { done, value } = await reader.read();
                         if (done) {
@@ -303,9 +329,10 @@ const MarketView: React.FC = () => {
                             try {
                               const data = JSON.parse(line.slice(6));
                               if (data.type === 'content') {
-                                setStreamingStrategy(prev => prev + data.content);
+                                fullStrategy += data.content;
+                                setStreamingStrategy(fullStrategy);
                               } else if (data.type === 'done') {
-                                setStrategy(data.content);
+                                setStrategy(fullStrategy);
                                 reader.cancel();
                                 break;
                               }
@@ -328,7 +355,116 @@ const MarketView: React.FC = () => {
                 </button>
               </div>
               {(streamingStrategy || strategy) && (
-                <div className="prose max-w-none">
+                <div className="prose max-w-none bg-gray-50 p-6 rounded-lg">
+                  <style>{`
+                    .prose h1 {
+                      font-size: 1.5rem;
+                      font-weight: 600;
+                      margin-top: 1.5rem;
+                      margin-bottom: 1rem;
+                      color: #1a202c;
+                    }
+                    .prose h2 {
+                      font-size: 1.25rem;
+                      font-weight: 600;
+                      margin-top: 1.25rem;
+                      margin-bottom: 0.75rem;
+                      color: #2d3748;
+                    }
+                    .prose h3 {
+                      font-size: 1.125rem;
+                      font-weight: 600;
+                      margin-top: 1rem;
+                      margin-bottom: 0.5rem;
+                      color: #4a5568;
+                    }
+                    .prose p {
+                      margin-top: 0.75rem;
+                      margin-bottom: 0.75rem;
+                      line-height: 1.75;
+                      color: #4a5568;
+                    }
+                    .prose ul {
+                      margin-top: 0.75rem;
+                      margin-bottom: 0.75rem;
+                      padding-left: 1.5rem;
+                      list-style-type: disc;
+                    }
+                    .prose ol {
+                      margin-top: 0.75rem;
+                      margin-bottom: 0.75rem;
+                      padding-left: 1.5rem;
+                      list-style-type: decimal;
+                    }
+                    .prose li {
+                      margin-top: 0.25rem;
+                      margin-bottom: 0.25rem;
+                      color: #4a5568;
+                    }
+                    .prose strong {
+                      font-weight: 600;
+                      color: #2d3748;
+                    }
+                    .prose em {
+                      font-style: italic;
+                      color: #4a5568;
+                    }
+                    .prose code {
+                      background-color: #edf2f7;
+                      padding: 0.2rem 0.4rem;
+                      border-radius: 0.25rem;
+                      font-family: monospace;
+                      font-size: 0.875rem;
+                      color: #2d3748;
+                    }
+                    .prose pre {
+                      background-color: #2d3748;
+                      color: #e2e8f0;
+                      padding: 1rem;
+                      border-radius: 0.5rem;
+                      overflow-x: auto;
+                      margin-top: 1rem;
+                      margin-bottom: 1rem;
+                    }
+                    .prose pre code {
+                      background-color: transparent;
+                      padding: 0;
+                      color: inherit;
+                    }
+                    .prose blockquote {
+                      border-left: 4px solid #e2e8f0;
+                      padding-left: 1rem;
+                      margin-left: 0;
+                      margin-right: 0;
+                      font-style: italic;
+                      color: #4a5568;
+                    }
+                    .prose hr {
+                      border: 0;
+                      border-top: 1px solid #e2e8f0;
+                      margin-top: 2rem;
+                      margin-bottom: 2rem;
+                    }
+                    .prose table {
+                      width: 100%;
+                      border-collapse: collapse;
+                      margin-top: 1rem;
+                      margin-bottom: 1rem;
+                    }
+                    .prose th {
+                      background-color: #edf2f7;
+                      padding: 0.75rem;
+                      text-align: left;
+                      font-weight: 600;
+                      color: #2d3748;
+                      border: 1px solid #e2e8f0;
+                    }
+                    .prose td {
+                      padding: 0.75rem;
+                      border: 1px solid #e2e8f0;
+                      color: #4a5568;
+                    }
+                  `}</style>
                   <ReactMarkdown>{streamingStrategy || strategy}</ReactMarkdown>
                 </div>
               )}

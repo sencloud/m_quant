@@ -21,7 +21,7 @@ async def get_spread_data(
     far_contract: str = "M2601.DCE"
 ) -> List[dict]:
     """
-    获取近远月合约价差数据
+    获取跨期合约价差数据
     """
     market_service = MarketDataService()
     

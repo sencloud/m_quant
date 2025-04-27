@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link, NavLink } from 'react-router-dom';
 import { Dropdown, Modal } from 'antd';
-import { DownOutlined, CrownOutlined, HistoryOutlined, LineChartOutlined, HeartOutlined, BarChartOutlined, FundOutlined, TeamOutlined } from '@ant-design/icons';
+import { DownOutlined, CrownOutlined, HistoryOutlined, LineChartOutlined, HeartOutlined, BarChartOutlined, FundOutlined, TeamOutlined, GithubOutlined } from '@ant-design/icons';
 
 const Header: React.FC = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -191,13 +191,24 @@ const Header: React.FC = () => {
                 </span>
               </a>
             </Dropdown>
-            <a 
-              onClick={showDonateModal}
-              className="inline-flex items-center px-3 py-2 text-sm font-medium text-white bg-gradient-to-r from-red-500 to-pink-500 hover:from-red-600 hover:to-pink-600 rounded-md shadow-sm cursor-pointer"
-            >
-              <HeartOutlined className="mr-1" />
-              <span className="font-bold">赞赏</span>
-            </a>
+            <div className="flex space-x-2">
+              <a 
+                href="https://github.com/sencloud/m_quant"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center px-3 py-2 text-sm font-medium text-white bg-gray-800 hover:bg-gray-900 rounded-md shadow-sm"
+              >
+                <GithubOutlined className="mr-1" />
+                <span className="font-bold">GitHub</span>
+              </a>
+              <a 
+                onClick={showDonateModal}
+                className="inline-flex items-center px-3 py-2 text-sm font-medium text-white bg-gradient-to-r from-red-500 to-pink-500 hover:from-red-600 hover:to-pink-600 rounded-md shadow-sm cursor-pointer"
+              >
+                <HeartOutlined className="mr-1" />
+                <span className="font-bold">赞赏</span>
+              </a>
+            </div>
           </nav>
 
           {/* Mobile menu button */}
@@ -348,17 +359,32 @@ const Header: React.FC = () => {
               </NavLink> */}
             </div>
           </div>
-          <div 
-            className="flex items-center py-2 px-4 hover:bg-gray-50 rounded-md cursor-pointer bg-gradient-to-r from-red-50 to-pink-50"
-            onClick={() => {
-              setIsMenuOpen(false);
-              showDonateModal();
-            }}
-          >
-            <HeartOutlined className="mr-3 text-red-500" />
-            <div>
-              <div className="font-bold text-red-600">赞赏</div>
-              <div className="text-xs text-gray-500">支持我们的发展</div>
+          <div className="px-3 py-2 space-y-2">
+            <a 
+              href="https://github.com/sencloud/m_quant"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center py-2 px-4 hover:bg-gray-50 rounded-md bg-gray-800 text-white"
+              onClick={() => setIsMenuOpen(false)}
+            >
+              <GithubOutlined className="mr-3" />
+              <div>
+                <div className="font-bold">GitHub</div>
+                <div className="text-xs text-gray-300">查看源代码</div>
+              </div>
+            </a>
+            <div 
+              className="flex items-center py-2 px-4 hover:bg-gray-50 rounded-md cursor-pointer bg-gradient-to-r from-red-50 to-pink-50"
+              onClick={() => {
+                setIsMenuOpen(false);
+                showDonateModal();
+              }}
+            >
+              <HeartOutlined className="mr-3 text-red-500" />
+              <div>
+                <div className="font-bold text-red-600">赞赏</div>
+                <div className="text-xs text-gray-500">支持我们的发展</div>
+              </div>
             </div>
           </div>
         </div>

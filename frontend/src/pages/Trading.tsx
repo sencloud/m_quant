@@ -73,7 +73,7 @@ const Trading: React.FC = () => {
             交易策略
           </h1>
           <p className="mt-3 max-w-2xl mx-auto text-xl text-gray-500 sm:mt-4">
-            探索专业的豆粕交易策略，包括ETF金叉策略、近远月套利策略等
+            探索专业的豆粕交易策略，包括ETF金叉策略、跨期套利策略等
           </p>
         </div>
 
@@ -90,7 +90,7 @@ const Trading: React.FC = () => {
         </StrategyCard> */}
 
         <StrategyCard
-          title="豆粕近远月套利策略"
+          title="豆粕跨期套利策略"
           tags={[
             { text: "套利策略", color: "text-indigo-800 bg-indigo-100" },
             { text: "价差交易", color: "text-orange-800 bg-orange-100" },
