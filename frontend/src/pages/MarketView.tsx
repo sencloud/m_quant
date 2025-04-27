@@ -6,6 +6,7 @@ import Toast from '../components/Toast';
 import Layout from '../components/layout/Layout';
 import ReactMarkdown from 'react-markdown';
 import Signallet from '../components/Signallet';
+import { Select } from 'antd';
 
 interface MarketData {
   price: number;
@@ -25,6 +26,12 @@ interface SRLevel {
   break_time: string | null;
   retest_times: string[];
   timeframe: string;
+}
+
+interface Contract {
+  symbol: string;
+  name: string;
+  is_main: boolean;
 }
 
 const SkeletonCard = () => (
@@ -65,11 +72,39 @@ const MarketView: React.FC = () => {
     message: string;
     type: 'success' | 'error' | 'info';
   } | null>(null);
+  const [contracts, setContracts] = useState<Contract[]>([]);
+  const [selectedContract, setSelectedContract] = useState<string>('');
+
+  // 获取合约列表
+  const fetchContracts = async () => {
+    try {
+      const response = await axios.get(`${API_BASE_URL}/market/futures/contracts/list`);
+      // 按合约代码排序
+      const sortedContracts = response.data.sort((a: Contract, b: Contract) => a.symbol.localeCompare(b.symbol));
+      setContracts(sortedContracts);
+      // 默认选择主力合约
+      const mainContract = sortedContracts.find((c: Contract) => c.is_main);
+      if (mainContract) {
+        setSelectedContract(mainContract.symbol);
+      }
+    } catch (error) {
+      console.error('获取合约列表失败:', error);
+      setToast({
+        message: '获取合约列表失败',
+        type: 'error'
+      });
+    }
+  };
+
+  useEffect(() => {
+    fetchContracts();
+  }, []);
 
   // 获取实时行情数据
   const fetchMarketData = async () => {
+    if (!selectedContract) return;
     try {
-      const response = await axios.get(`${API_BASE_URL}/market/realtime`);
+      const response = await axios.get(`${API_BASE_URL}/market/realtime?contract=${selectedContract}`);
       setMarketData(response.data);
     } catch (error) {
       console.error('获取行情数据失败:', error);
@@ -89,6 +124,12 @@ const MarketView: React.FC = () => {
       const now = new Date();
       const hours = now.getHours();
       const minutes = now.getMinutes();
+      
+      // 判断是否为工作日
+      const day = now.getDay();
+      if (day === 0 || day === 6) { // 0是周日，6是周六
+        return false;
+      }
       
       // 上午9:00-11:30
       if ((hours === 9 && minutes >= 0) || 
@@ -122,7 +163,7 @@ const MarketView: React.FC = () => {
     return () => {
       clearInterval(timer);
     };
-  }, []);
+  }, [selectedContract]);
 
   // 清理函数
   const cleanupEventSource = () => {
@@ -184,10 +225,19 @@ const MarketView: React.FC = () => {
 
             <div className="bg-white rounded-lg p-6 mb-8">
               <div className="flex justify-between items-center mb-6">
-                <h2 className="text-2xl font-bold text-gray-900">豆粕2509合约行情</h2>
+                <h2 className="text-2xl font-bold text-gray-900">豆粕期货行情</h2>
+                <Select
+                  value={selectedContract}
+                  onChange={setSelectedContract}
+                  style={{ width: 120 }}
+                  options={contracts.map(contract => ({
+                    value: contract.symbol,
+                    label: contract.name
+                  }))}
+                />
               </div>
               <div>
-                <KLineChart ref={chartRef} />
+                <KLineChart ref={chartRef} contract={selectedContract} />
               </div>
             </div>
 

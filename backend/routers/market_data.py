@@ -109,6 +109,21 @@ async def get_futures_contracts_data(
         logger.error(f"多合约数据请求失败: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
+@router.get("/futures/contracts/list")
+async def get_futures_contracts_list(
+    service: MarketDataService = Depends(get_market_data_service)
+):
+    """获取豆粕期货合约列表"""
+    logger.info("收到期货合约列表请求")
+    try:
+        # 获取所有豆粕期货合约
+        contracts = service.get_futures_contracts_list()
+        logger.info(f"成功返回期货合约列表，共{len(contracts)}个合约")
+        return contracts
+    except Exception as e:
+        logger.error(f"期货合约列表请求失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 @router.get("/inventory", response_model=List[InventoryData])
 async def get_inventory_data(
     service: MarketDataService = Depends(get_market_data_service)
@@ -549,13 +564,12 @@ async def get_support_resistance_data(period: str = "daily"):
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/kline/{period}")
-async def get_kline_data(period: str):
-    """获取豆粕主力合约K线数据
-    period: 15/30/60/d 分钟或日线
-    """
+async def get_kline_data(period: str, contract: str = "M2509"):
+    """获取K线数据"""
+    logger.info(f"收到K线数据请求 - 周期: {period}, 合约: {contract}")
     try:
         # 获取主力合约代码
-        m_symbol = 'M2509'
+        m_symbol = contract
         
         if period == 'd':
             # 日线数据
@@ -600,11 +614,12 @@ async def get_kline_data(period: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/realtime")
-async def get_realtime_data():
-    """获取豆粕主力合约实时行情数据"""
+async def get_realtime_data(contract: str = "M2509"):
+    """获取实时行情数据"""
+    logger.info(f"收到实时行情数据请求 - 合约: {contract}")
     try:
         # 获取实时行情
-        df = ak.futures_zh_spot(symbol='M2509', market="CF", adjust='0')
+        df = ak.futures_zh_spot(symbol=contract, market="CF", adjust='0')
         if df.empty:
             raise HTTPException(status_code=404, detail="未获取到行情数据")
             

@@ -2069,3 +2069,95 @@ class MarketDataService:
             import traceback
             logger.error(f"错误堆栈: {traceback.format_exc()}")
             raise
+
+    def get_futures_contracts_list(self) -> List[dict]:
+        """获取豆粕期货合约列表"""
+        try:
+            # 获取所有豆粕期货合约
+            contracts = ak.futures_zh_realtime(symbol="豆粕")
+            if contracts.empty:
+                return []
+            
+            # 获取主力合约
+            dce_text = ak.match_main_contract(symbol="dce")
+            m_contracts = [contract for contract in dce_text.split(',') if contract.startswith('M') and contract[1:].isdigit()]
+            main_contract_code = m_contracts[0]
+            
+            # 处理合约列表
+            contract_list = []
+            for _, row in contracts.iterrows():
+                # 过滤掉M0合约
+                if not row['symbol'].startswith('M0'):
+                    contract_list.append({
+                        'symbol': row['symbol'],
+                        'name': row['name'],
+                        'is_main': row['symbol'] == main_contract_code
+                    })
+            logger.info(f"获取到的合约列表: {contract_list}")
+
+            return contract_list
+        except Exception as e:
+            logger.error(f"获取合约列表失败: {str(e)}")
+            import traceback
+            logger.error(f"错误堆栈: {traceback.format_exc()}")
+            return []
+
+    async def get_realtime_data(self, contract: str) -> dict:
+        """获取实时行情数据"""
+        try:
+            # 获取实时行情
+            df = ak.futures_zh_spot(symbol=contract, market="CF", adjust='0')
+            if df.empty:
+                raise Exception("未获取到行情数据")
+                
+            # 计算涨跌幅
+            price = float(df['current_price'].iloc[0])
+            # 使用last_settle_price代替settlement
+            settlement = float(df['last_settle_price'].iloc[0])
+            change = price - settlement
+            change_percent = (change / settlement) * 100
+            
+            return {
+                "price": price,
+                "change": change,
+                "changePercent": change_percent,
+                "volume": int(df['volume'].iloc[0]),
+                "turnover": float(df.get('avg_price', 0).iloc[0]) if 'avg_price' in df.columns else 0,
+                "openInterest": int(df['hold'].iloc[0]),
+                "settlement": settlement
+            }
+        except Exception as e:
+            logger.error(f"获取实时行情数据失败: {str(e)}")
+            raise
+
+    async def get_kline_data(self, period: str, contract: str) -> List[dict]:
+        """获取K线数据"""
+        try:
+            if period == 'd':
+                # 日线数据
+                df = ak.futures_zh_daily_sina(symbol=contract)
+                # 重命名列以匹配前端期望的格式
+                df = df.rename(columns={
+                    'hold': 'open_interest'
+                })
+            else:
+                # 分钟线数据
+                period_map = {"15": "15", "30": "30", "60": "60"}
+                sina_period = period_map.get(period, "5")  # 默认使用5分钟
+                
+                df = ak.futures_zh_minute_sina(symbol=contract, period=sina_period)
+                # 重命名列以匹配前端期望的格式
+                df = df.rename(columns={
+                    'datetime': 'date',
+                    'hold': 'open_interest'
+                })
+
+            # 确保数据按时间排序
+            df = df.sort_values('date')
+            df = df.reset_index(drop=True)
+            
+            # 转换为字典列表
+            return df.to_dict(orient='records')
+        except Exception as e:
+            logger.error(f"获取K线数据失败: {str(e)}")
+            raise

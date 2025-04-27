@@ -76,18 +76,18 @@ const Header: React.FC = () => {
         </Link>
       ),
     },
-    {
-      key: 'agents',
-      label: (
-        <Link to="/agents" className="flex items-center py-2 px-4 hover:bg-gray-50">
-          <TeamOutlined className="mr-3 text-yellow-500 text-xl" />
-          <div>
-            <div className="font-medium">多智能体分析</div>
-            <div className="text-xs text-gray-500">金融专家智能体组合分析策略</div>
-          </div>
-        </Link>
-      ),
-    }
+    // {
+    //   key: 'agents',
+    //   label: (
+    //     <Link to="/agents" className="flex items-center py-2 px-4 hover:bg-gray-50">
+    //       <TeamOutlined className="mr-3 text-yellow-500 text-xl" />
+    //       <div>
+    //         <div className="font-medium">多智能体分析</div>
+    //         <div className="text-xs text-gray-500">金融专家智能体组合分析策略</div>
+    //       </div>
+    //     </Link>
+    //   ),
+    // }
   ];
 
   // 研究报告子菜单项
@@ -335,7 +335,7 @@ const Header: React.FC = () => {
                   <div className="text-xs text-gray-500">进口数据深度分析与预测</div>
                 </div>
               </NavLink>
-              <NavLink
+              {/* <NavLink
                 to="/agents"
                 className="flex items-center py-2 px-4 hover:bg-gray-50 rounded-md"
                 onClick={() => setIsMenuOpen(false)}
@@ -345,7 +345,7 @@ const Header: React.FC = () => {
                   <div className="font-medium">多智能体分析</div>
                   <div className="text-xs text-gray-500">金融专家智能体组合分析策略</div>
                 </div>
-              </NavLink>
+              </NavLink> */}
             </div>
           </div>
           <div 

@@ -25,6 +25,7 @@ interface SRLevel {
 }
 
 interface KLineChartProps {
+  contract?: string;
 }
 
 const KLineChart = React.forwardRef<any, KLineChartProps>((props, ref) => {
@@ -136,8 +137,11 @@ const KLineChart = React.forwardRef<any, KLineChartProps>((props, ref) => {
   };
 
   const fetchData = async () => {
+    if (!props.contract) return;
     try {
-      const response = await axios.get(API_ENDPOINTS.market.kline(period));
+      const response = await axios.get(API_ENDPOINTS.market.kline(period), {
+        params: { contract: props.contract }
+      });
       const { kline_data: data, sr_levels } = response.data;
       
       // 更新图表
@@ -312,6 +316,13 @@ const KLineChart = React.forwardRef<any, KLineChartProps>((props, ref) => {
     }
   };
 
+  // 当合约变化时重新获取数据
+  useEffect(() => {
+    if (props.contract) {
+      fetchData();
+    }
+  }, [props.contract]);
+
   useEffect(() => {
     if (chartRef.current) {
       chartInstance.current = echarts.init(chartRef.current);
@@ -476,9 +487,6 @@ const KLineChart = React.forwardRef<any, KLineChartProps>((props, ref) => {
       chartInstance.current.setOption(option);
     }
 
-    // 初始加载数据
-    fetchData();
-
     // 监听缩放事件
     if (chartInstance.current) {
       chartInstance.current.on('dataZoom', updateMarkPoints);
@@ -489,6 +497,11 @@ const KLineChart = React.forwardRef<any, KLineChartProps>((props, ref) => {
         const now = new Date();
         const hours = now.getHours();
         const minutes = now.getMinutes();
+
+        const day = now.getDay();
+        if (day === 0 || day === 6) { // 0是周日，6是周六
+          return false;
+        }
         
         // 上午9:00-11:30
         if ((hours === 9 && minutes >= 0) || 
