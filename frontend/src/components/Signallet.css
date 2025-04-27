@@ -46,6 +46,14 @@
   margin-top: 4px;
 }
 
+.signallet-section {
+  margin-bottom: 16px;
+}
+
+.signallet-section:last-child {
+  margin-bottom: 0;
+}
+
 .signallet-signals {
   display: flex;
   flex-direction: column;

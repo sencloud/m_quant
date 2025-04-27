@@ -74,6 +74,7 @@ const MarketView: React.FC = () => {
   } | null>(null);
   const [contracts, setContracts] = useState<Contract[]>([]);
   const [selectedContract, setSelectedContract] = useState<string>('');
+  const [srLevels, setSRLevels] = useState<SRLevel[]>([]);
 
   // 获取合约列表
   const fetchContracts = async () => {
@@ -111,14 +112,32 @@ const MarketView: React.FC = () => {
     }
   };
 
+  // 获取支撑阻力位数据
+  const fetchSRLevels = async () => {
+    if (!selectedContract) return;
+    try {
+      const response = await axios.get(`${API_BASE_URL}/market/kline/30`, {
+        params: { contract: selectedContract }
+      });
+      setSRLevels(response.data.sr_levels);
+    } catch (error) {
+      console.error('获取支撑阻力位数据失败:', error);
+      setToast({
+        message: '获取支撑阻力位数据失败',
+        type: 'error'
+      });
+    }
+  };
+
   useEffect(() => {
     fetchContracts();
   }, []);
 
-  // 当合约变化时获取策略
+  // 当合约变化时获取策略和支撑阻力位数据
   useEffect(() => {
     if (selectedContract) {
       fetchStrategy();
+      fetchSRLevels();
     }
   }, [selectedContract]);
 
