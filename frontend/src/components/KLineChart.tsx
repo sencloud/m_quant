@@ -12,6 +12,8 @@ interface KLineData {
   close: number;
   volume: number;
   open_interest: number;
+  ema5: number;
+  ema20: number;
 }
 
 interface SRLevel {
@@ -297,7 +299,32 @@ const KLineChart = React.forwardRef<any, KLineChartProps>((props, ref) => {
                 }
               }
             }
-          }, {
+          },
+          {
+            name: 'EMA5',
+            type: 'line',
+            data: data.map((item: KLineData) => [item.date, item.ema5]),
+            smooth: 0.4,
+            symbol: 'none',
+            lineStyle: {
+              width: 1.5,
+              color: '#FFA500',
+              opacity: 0.8
+            }
+          },
+          {
+            name: 'EMA20',
+            type: 'line',
+            data: data.map((item: KLineData) => [item.date, item.ema20]),
+            smooth: 0.4,
+            symbol: 'none',
+            lineStyle: {
+              width: 1.5,
+              color: '#4169E1',
+              opacity: 0.8
+            }
+          },
+          {
             name: 'Volume',
             type: 'bar',
             xAxisIndex: 1,
@@ -332,7 +359,7 @@ const KLineChart = React.forwardRef<any, KLineChartProps>((props, ref) => {
         legend: {
           bottom: 10,
           left: 'center',
-          data: ['豆粕主力']
+          data: ['豆粕主力', 'EMA5', 'EMA20']
         },
         toolbox: {
           right: '5%',
@@ -472,6 +499,30 @@ const KLineChart = React.forwardRef<any, KLineChartProps>((props, ref) => {
                   return typeof param.value === 'number' ? param.value.toFixed(0) : param.value;
                 }
               }
+            }
+          },
+          {
+            name: 'EMA5',
+            type: 'line',
+            data: [],
+            smooth: 0.4,
+            symbol: 'none',
+            lineStyle: {
+              width: 1.5,
+              color: '#FFA500',
+              opacity: 0.8
+            }
+          },
+          {
+            name: 'EMA20',
+            type: 'line',
+            data: [],
+            smooth: 0.4,
+            symbol: 'none',
+            lineStyle: {
+              width: 1.5,
+              color: '#4169E1',
+              opacity: 0.8
             }
           },
           {

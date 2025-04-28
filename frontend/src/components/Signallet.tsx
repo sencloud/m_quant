@@ -15,14 +15,25 @@ interface SRLevel {
   timeframe: string;
 }
 
-const Signallet: React.FC = () => {
+interface SignalletProps {
+  srLevels: SRLevel[];
+  selectedContract: string;
+}
+
+const Signallet: React.FC<SignalletProps> = ({ srLevels, selectedContract }) => {
   const [signals, setSignals] = useState<Signal[]>([]);
-  const [srLevels, setSRLevels] = useState<SRLevel[]>([]);
   const [statistics, setStatistics] = useState({
     totalProfit: 0,
     winRate: 0,
     openSignals: 0
   });
+
+  const isSignalNearSRLevel = (signal: Signal): boolean => {
+    const priceDiff = 0.01; // 1% 的价格差异阈值
+    return srLevels.some(level => 
+      Math.abs(signal.price - level.price) / level.price <= priceDiff
+    );
+  };
 
   const fetchSignals = async () => {
     try {
@@ -35,30 +46,33 @@ const Signallet: React.FC = () => {
             start_date: startDate.toISOString().split('T')[0],
             end_date: new Date().toISOString().split('T')[0],
             page: 1,
-            page_size: 1000
+            page_size: 1000,
+            contract: selectedContract
           }
         }),
         axios.get(`${API_BASE_URL}/account/account`)
       ]);
       
-      const signals = statsResponse.data.signals;
-      const closedSignals = signals.filter((s: Signal) => 
+      const allSignals = statsResponse.data.signals;
+      const validSignals = allSignals.filter(isSignalNearSRLevel);
+      
+      const closedSignals = validSignals.filter((s: Signal) => 
         s.status === 'closed' || s.status === 'partial_closed'
       ).length;
       
-      const totalProfit = signals.reduce((sum: number, s: Signal) => {
+      const totalProfit = validSignals.reduce((sum: number, s: Signal) => {
         if (s.status === 'closed' || s.status === 'partial_closed') {
           return sum + (s.profit || 0);
         }
         return sum;
       }, 0);
       
-      const profitableSignals = signals.filter((s: Signal) => 
+      const profitableSignals = validSignals.filter((s: Signal) => 
         (s.status === 'closed' || s.status === 'partial_closed') && s.profit > 0
       ).length;
       
       const winRate = closedSignals > 0 ? (profitableSignals / closedSignals) * 100 : 0;
-      const openSignals = signals.filter((s: Signal) => s.status === 'open').length;
+      const openSignals = validSignals.filter((s: Signal) => s.status === 'open').length;
       
       setStatistics({
         totalProfit,
@@ -66,33 +80,17 @@ const Signallet: React.FC = () => {
         openSignals
       });
 
-      // 只获取最近的5个信号
-      setSignals(signals.slice(0, 5));
+      setSignals(validSignals);
     } catch (error) {
       console.error('获取信号数据失败:', error);
     }
   };
 
-  const fetchSRLevels = async () => {
-    try {
-      const response = await axios.get(`${API_BASE_URL}/market/kline/30`, {
-        params: { contract: 'M2509' } // 默认使用主力合约
-      });
-      setSRLevels(response.data.sr_levels);
-    } catch (error) {
-      console.error('获取支撑阻力位数据失败:', error);
-    }
-  };
-
   useEffect(() => {
     fetchSignals();
-    fetchSRLevels();
-    const timer = setInterval(() => {
-      fetchSignals();
-      fetchSRLevels();
-    }, 60000); // 每分钟更新一次
+    const timer = setInterval(fetchSignals, 60000);
     return () => clearInterval(timer);
-  }, []);
+  }, [srLevels, selectedContract]);
 
   return (
     <div className="signallet">

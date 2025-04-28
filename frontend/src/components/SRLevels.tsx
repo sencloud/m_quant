@@ -15,29 +15,27 @@ interface SRLevelsProps {
 }
 
 const SRLevels: React.FC<SRLevelsProps> = ({ levels }) => {
-  // 只显示最近1个月的数据
-  const oneMonthAgo = new Date();
-  oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
+  // 只显示最近90天的数据，并且只显示未突破的支撑阻力位
+  const ninetyDaysAgo = new Date();
+  ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
 
   const recentLevels = levels.filter(level => {
     const startTime = new Date(level.start_time);
-    return startTime >= oneMonthAgo;
+    return startTime >= ninetyDaysAgo && !level.break_time; // 只显示未突破的
   });
 
-  const supportLevels = recentLevels.filter(level => level.type === 'Support');
-  const resistanceLevels = recentLevels.filter(level => level.type === 'Resistance');
+  // 按强度排序
+  const sortedLevels = recentLevels.sort((a, b) => b.strength - a.strength);
+
+  const supportLevels = sortedLevels.filter(level => level.type === 'Support');
+  const resistanceLevels = sortedLevels.filter(level => level.type === 'Resistance');
 
   const renderLevel = (level: SRLevel) => {
-    const isActive = !level.break_time;
     const isRetesting = level.retest_times.length > 0;
 
     return (
       <div key={`${level.type}-${level.price}`} 
-           className={`p-3 rounded-lg border ${
-             isActive 
-               ? 'border-green-200 bg-green-50' 
-               : 'border-gray-200 bg-gray-50'
-           }`}>
+           className="p-3 rounded-lg border border-green-200 bg-green-50">
         <div className="flex justify-between items-center">
           <div className="flex items-center">
             <div className={`w-2 h-2 rounded-full mr-2 ${
@@ -50,11 +48,9 @@ const SRLevels: React.FC<SRLevelsProps> = ({ levels }) => {
             </span>
           </div>
           <div className="flex items-center space-x-2">
-            {isActive && (
-              <span className="px-2 py-1 text-xs rounded-full bg-green-100 text-green-800">
-                有效
-              </span>
-            )}
+            <span className="px-2 py-1 text-xs rounded-full bg-green-100 text-green-800">
+              有效
+            </span>
             {isRetesting && (
               <span className="px-2 py-1 text-xs rounded-full bg-blue-100 text-blue-800">
                 回测中
@@ -69,9 +65,6 @@ const SRLevels: React.FC<SRLevelsProps> = ({ levels }) => {
         </div>
         <div className="mt-2 text-xs text-gray-500">
           <div>开始: {new Date(level.start_time).toLocaleDateString()}</div>
-          {level.break_time && (
-            <div>突破: {new Date(level.break_time).toLocaleDateString()}</div>
-          )}
           {isRetesting && (
             <div className="mt-1">
               最近回测: {new Date(level.retest_times[level.retest_times.length - 1]).toLocaleDateString()}

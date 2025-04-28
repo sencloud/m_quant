@@ -491,7 +491,7 @@ const MarketView: React.FC = () => {
           </div>
           
           <div className="fixed top-32 right-8">
-            <Signallet />
+            <Signallet srLevels={srLevels} selectedContract={selectedContract} />
           </div>
         </div>
 

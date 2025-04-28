@@ -19,6 +19,7 @@ from pydantic import BaseModel
 from models.trading_strategy import TradingStrategy
 from sqlalchemy.orm import Session
 from sqlalchemy import create_engine
+import talib
 
 router = APIRouter()
 
@@ -516,6 +517,14 @@ async def get_support_resistance_data(period: str = "daily"):
         # 打印一些调试信息
         logger.debug(f"数据日期范围: {df['date'].min()} to {df['date'].max()}")
         
+        # 计算EMA指标
+        df['ema5'] = talib.EMA(df['close'].values, timeperiod=5)
+        df['ema20'] = talib.EMA(df['close'].values, timeperiod=20)
+
+        # 处理NaN值
+        df['ema5'] = df['ema5'].fillna(method='ffill').fillna(method='bfill')
+        df['ema20'] = df['ema20'].fillna(method='ffill').fillna(method='bfill')
+
         # 使用SupportResistanceService计算支撑位和阻力位
         sr_service = SupportResistanceService()
         sr_levels = sr_service.get_sr_levels(df, period)
@@ -600,6 +609,14 @@ async def get_kline_data(period: str, contract: str = "M2509"):
         # 确保数据按时间排序
         df = df.sort_values('date')
         df = df.reset_index(drop=True)
+
+        # 计算EMA指标
+        df['ema5'] = talib.EMA(df['close'].values, timeperiod=5)
+        df['ema20'] = talib.EMA(df['close'].values, timeperiod=20)
+
+        # 处理NaN值
+        df['ema5'] = df['ema5'].fillna(method='ffill').fillna(method='bfill')
+        df['ema20'] = df['ema20'].fillna(method='ffill').fillna(method='bfill')
 
         # 使用SupportResistanceService计算支撑位和阻力位
         sr_service = SupportResistanceService()
