@@ -5,6 +5,19 @@ import { Signal } from '../api/signals';
 import SRLevels from './SRLevels';
 import './Signallet.css';
 
+interface KLineData {
+  date: string;
+  symbol: string;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume: number;
+  ema5: number;
+  ema20: number;
+  open_interest: number;
+}
+
 interface SRLevel {
   price: number;
   type: 'Support' | 'Resistance';
@@ -22,6 +35,7 @@ interface SignalletProps {
 
 const Signallet: React.FC<SignalletProps> = ({ srLevels, selectedContract }) => {
   const [signals, setSignals] = useState<Signal[]>([]);
+  const [activeTab, setActiveTab] = useState<'signals' | 'srlevels'>('signals');
   const [statistics, setStatistics] = useState({
     totalProfit: 0,
     winRate: 0,
@@ -37,23 +51,52 @@ const Signallet: React.FC<SignalletProps> = ({ srLevels, selectedContract }) => 
 
   const fetchSignals = async () => {
     try {
+      // 如果没有选中合约，直接返回
+      if (!selectedContract) {
+        return;
+      }
+
       const startDate = new Date();
       startDate.setDate(startDate.getDate() - 7);
       
-      const [statsResponse, accountResponse] = await Promise.all([
-        axios.get(`${API_BASE_URL}/signals`, {
+      const [klineResponse, accountResponse] = await Promise.all([
+        axios.get(`${API_BASE_URL}/market/kline/30`, {
           params: {
-            start_date: startDate.toISOString().split('T')[0],
-            end_date: new Date().toISOString().split('T')[0],
-            page: 1,
-            page_size: 1000,
             contract: selectedContract
           }
         }),
         axios.get(`${API_BASE_URL}/account/account`)
       ]);
+
+      // 确保K线数据存在且格式正确
+      if (!klineResponse.data?.kline_data || !Array.isArray(klineResponse.data.kline_data)) {
+        console.error('K线数据格式错误:', klineResponse.data);
+        return;
+      }
+
+      // 转换K线数据格式
+      const formattedKlines = klineResponse.data.kline_data.map((kline: KLineData) => ({
+        date: kline.date,
+        symbol: "期货-" + selectedContract,
+        open: kline.open,
+        high: kline.high,
+        low: kline.low,
+        close: kline.close,
+        volume: kline.volume,
+        ema5: kline.ema5,
+        ema20: kline.ema20,
+        open_interest: kline.open_interest
+      }));
+
+      const signalResponse = await axios.post(`${API_BASE_URL}/signals`, {
+        start_date: startDate.toISOString().split('T')[0],
+        end_date: new Date().toISOString().split('T')[0],
+        page: 1,
+        page_size: 1000,
+        klines: formattedKlines
+      });
       
-      const allSignals = statsResponse.data.signals;
+      const allSignals = signalResponse.data.signals;
       const validSignals = allSignals.filter(isSignalNearSRLevel);
       
       const closedSignals = validSignals.filter((s: Signal) => 
@@ -87,9 +130,12 @@ const Signallet: React.FC<SignalletProps> = ({ srLevels, selectedContract }) => 
   };
 
   useEffect(() => {
-    fetchSignals();
-    const timer = setInterval(fetchSignals, 60000);
-    return () => clearInterval(timer);
+    // 只有在有选中合约时才开始轮询
+    if (selectedContract) {
+      fetchSignals();
+      const timer = setInterval(fetchSignals, 60000);
+      return () => clearInterval(timer);
+    }
   }, [srLevels, selectedContract]);
 
   return (
@@ -117,47 +163,98 @@ const Signallet: React.FC<SignalletProps> = ({ srLevels, selectedContract }) => 
         </div>
       </div>
 
-      <div className="signallet-section">
-        <h3 className="text-sm font-medium text-gray-700 mb-2">交易信号</h3>
-        <div className="signallet-signals">
+      <div className="border-b border-gray-200 mb-4">
+        <nav className="-mb-px flex space-x-8" aria-label="Tabs">
+          <button
+            onClick={() => setActiveTab('signals')}
+            className={`${
+              activeTab === 'signals'
+                ? 'border-blue-500 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
+          >
+            交易信号
+          </button>
+          <button
+            onClick={() => setActiveTab('srlevels')}
+            className={`${
+              activeTab === 'srlevels'
+                ? 'border-blue-500 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
+          >
+            支撑阻力位
+          </button>
+        </nav>
+      </div>
+
+      {activeTab === 'signals' && (
+        <div className="signallet-signals space-y-4">
           {signals.map((signal) => (
-            <div key={signal.id} className="signal-item">
-              <div className="signal-header">
-                <span className="signal-symbol">{signal.symbol.split('-')[1]}</span>
-                <span className={`signal-tag ${signal.type}`}>
-                  {signal.type === 'BUY_OPEN' ? '买入开仓' : 
-                   signal.type === 'SELL_OPEN' ? '卖出开仓' :
-                   signal.type === 'BUY_CLOSE' ? '买入平仓' :
-                   signal.type === 'SELL_CLOSE' ? '卖出平仓' : signal.type}
-                </span>
-              </div>
-              <div className="signal-details">
-                <div className="signal-info">
-                  <span>价格: {signal.price.toFixed(2)}</span>
-                  <span>数量: {signal.quantity}</span>
-                </div>
-                <div className="signal-status">
-                  <span className={`status-tag ${signal.status}`}>
-                    {signal.status === 'open' ? '持仓中' : 
-                     signal.status === 'closed' ? '已平仓' :
-                     signal.status === 'partial_closed' ? '部分平仓' : signal.status}
+            <div key={signal.id} className="signal-item bg-white rounded-lg shadow p-4">
+              <div className="signal-header flex justify-between items-center mb-2">
+                <div className="flex items-center space-x-2">
+                  <span className="signal-symbol font-semibold">{signal.symbol.split('-')[1]}</span>
+                  <span className={`signal-tag px-2 py-1 rounded text-sm ${
+                    signal.type === 'BUY_OPEN' ? 'bg-red-100 text-red-800' :
+                    signal.type === 'SELL_OPEN' ? 'bg-green-100 text-green-800' :
+                    signal.type === 'BUY_CLOSE' ? 'bg-green-100 text-green-800' :
+                    'bg-red-100 text-red-800'  // SELL_CLOSE
+                  }`}>
+                    {signal.type === 'BUY_OPEN' ? '买入开仓' : 
+                     signal.type === 'SELL_OPEN' ? '卖出开仓' :
+                     signal.type === 'BUY_CLOSE' ? '买入平仓' :
+                     signal.type === 'SELL_CLOSE' ? '卖出平仓' : signal.type}
                   </span>
-                  {signal.profit !== undefined && (
-                    <span className={signal.profit >= 0 ? 'profit' : 'loss'}>
-                      {signal.profit.toFixed(2)}
-                    </span>
+                </div>
+              </div>
+
+              <div className="signal-details space-y-2 text-sm">
+                <div className="space-y-2">
+                  <div>
+                    <span className="text-gray-500">开仓价格:</span>
+                    <span className="ml-2 font-medium">{signal.price.toFixed(2)}</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">开仓时间:</span>
+                    <span className="ml-2">{new Date(signal.date).toLocaleString()}</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">信号说明:</span>
+                    <span className="ml-2">{signal.reason}</span>
+                  </div>
+                  {signal.close_price && (
+                    <div>
+                      <span className="text-gray-500">平仓价格:</span>
+                      <span className="ml-2 font-medium">{signal.close_price.toFixed(2)}</span>
+                    </div>
+                  )}
+                  {signal.close_date && (
+                    <div>
+                      <span className="text-gray-500">平仓时间:</span>
+                      <span className="ml-2">{new Date(signal.close_date).toLocaleString()}</span>
+                    </div>
+                  )}
+                  {signal.profit !== undefined && signal.profit !== 0 && (
+                    <div>
+                      <span className="text-gray-500">盈亏:</span>
+                      <span className={`ml-2 font-medium ${signal.profit >= 0 ? 'text-red-600' : 'text-green-600'}`}>
+                        {signal.profit >= 0 ? '+' : ''}{signal.profit.toFixed(2)}
+                      </span>
+                    </div>
                   )}
                 </div>
               </div>
             </div>
           ))}
         </div>
-      </div>
+      )}
 
-      <div className="signallet-section">
-        <h3 className="text-sm font-medium text-gray-700 mb-2">支撑阻力位</h3>
-        <SRLevels levels={srLevels} />
-      </div>
+      {activeTab === 'srlevels' && (
+        <div className="signallet-section">
+          <SRLevels levels={srLevels} />
+        </div>
+      )}
     </div>
   );
 };

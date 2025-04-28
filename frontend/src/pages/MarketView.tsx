@@ -87,6 +87,9 @@ const MarketView: React.FC = () => {
       const mainContract = sortedContracts.find((c: Contract) => c.is_main);
       if (mainContract) {
         setSelectedContract(mainContract.symbol);
+      } else if (sortedContracts.length > 0) {
+        // 如果没有标记主力合约，选择第一个合约
+        setSelectedContract(sortedContracts[0].symbol);
       }
     } catch (error) {
       console.error('获取合约列表失败:', error);
@@ -157,53 +160,56 @@ const MarketView: React.FC = () => {
   };
 
   useEffect(() => {
-    // 初始加载数据
-    fetchMarketData();
+    // 只有在有选中合约时才开始轮询
+    if (selectedContract) {
+      // 初始加载数据
+      fetchMarketData();
 
-    // 判断当前是否为交易时间
-    const isTradeTime = () => {
-      const now = new Date();
-      const hours = now.getHours();
-      const minutes = now.getMinutes();
-      
-      // 判断是否为工作日
-      const day = now.getDay();
-      if (day === 0 || day === 6) { // 0是周日，6是周六
+      // 判断当前是否为交易时间
+      const isTradeTime = () => {
+        const now = new Date();
+        const hours = now.getHours();
+        const minutes = now.getMinutes();
+        
+        // 判断是否为工作日
+        const day = now.getDay();
+        if (day === 0 || day === 6) { // 0是周日，6是周六
+          return false;
+        }
+        
+        // 上午9:00-11:30
+        if ((hours === 9 && minutes >= 0) || 
+            (hours === 10) || 
+            (hours === 11 && minutes <= 30)) {
+          return true;
+        }
+        
+        // 下午13:30-15:00
+        if ((hours === 13 && minutes >= 30) || 
+            (hours === 14)) {
+          return true;
+        }
+        
+        // 晚上21:00-23:00
+        if ((hours === 21) || 
+            (hours === 22)) {
+          return true;
+        }
+        
         return false;
-      }
-      
-      // 上午9:00-11:30
-      if ((hours === 9 && minutes >= 0) || 
-          (hours === 10) || 
-          (hours === 11 && minutes <= 30)) {
-        return true;
-      }
-      
-      // 下午13:30-15:00
-      if ((hours === 13 && minutes >= 30) || 
-          (hours === 14)) {
-        return true;
-      }
-      
-      // 晚上21:00-23:00
-      if ((hours === 21) || 
-          (hours === 22)) {
-        return true;
-      }
-      
-      return false;
-    };
+      };
 
-    // 只在交易时间内每3秒刷新一次数据
-    const timer = setInterval(() => {
-      if (isTradeTime()) {
-        fetchMarketData();
-      }
-    }, 3000);
+      // 只在交易时间内每3秒刷新一次数据
+      const timer = setInterval(() => {
+        if (isTradeTime()) {
+          fetchMarketData();
+        }
+      }, 3000);
 
-    return () => {
-      clearInterval(timer);
-    };
+      return () => {
+        clearInterval(timer);
+      };
+    }
   }, [selectedContract]);
 
   // 清理函数

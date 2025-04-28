@@ -4,36 +4,40 @@ from datetime import datetime, date
 from models.signals import Signal, SignalCreate, SignalUpdate
 from services.signals import SignalService
 from utils.logger import logger
+from models.kline import KLineData, SignalRequest
 
 router = APIRouter()
 
 def get_signal_service() -> SignalService:
     return SignalService()
 
-@router.get("/signals", response_model=dict)
+@router.post("/signals", response_model=dict)
 async def get_signals(
-    start_date: str = Query(..., description="开始日期 (YYYY-MM-DD)"),
-    end_date: str = Query(..., description="结束日期 (YYYY-MM-DD)"),
-    type: Optional[str] = Query(None, description="信号类型 (buy/sell/open/closed)"),
-    page: int = Query(1, description="页码，从1开始"),
-    page_size: int = Query(10, description="每页数量"),
+    request: SignalRequest,
     signal_service: SignalService = Depends(get_signal_service)
 ):
     """获取交易信号列表"""
     try:
         # 将字符串日期转换为datetime对象，设置时间为当天的开始和结束
-        start = datetime.strptime(start_date, "%Y-%m-%d").replace(hour=0, minute=0, second=0)
-        end = datetime.strptime(end_date, "%Y-%m-%d").replace(hour=23, minute=59, second=59)
+        start = datetime.strptime(request.start_date, "%Y-%m-%d").replace(hour=0, minute=0, second=0)
+        end = datetime.strptime(request.end_date, "%Y-%m-%d").replace(hour=23, minute=59, second=59)
         
         # 获取信号
-        signals, total = signal_service.get_signals(start, end, type, page, page_size)
+        signals, total = signal_service.generate_signals(
+            start, 
+            end, 
+            request.type, 
+            request.page, 
+            request.page_size,
+            request.klines
+        )
         
         return {
             "signals": signals,
             "total": total,
-            "page": page,
-            "page_size": page_size,
-            "total_pages": (total + page_size - 1) // page_size
+            "page": request.page,
+            "page_size": request.page_size,
+            "total_pages": (total + request.page_size - 1) // request.page_size
         }
     except Exception as e:
         logger.error(f"获取信号失败: {str(e)}", exc_info=True)

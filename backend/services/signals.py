@@ -12,6 +12,7 @@ from services.account import AccountService
 from services.position import PositionService
 from models.position import PositionCreate
 from config import get_multiplier, is_futures
+from models.kline import KLineData
 
 Base = declarative_base()
 
@@ -654,4 +655,90 @@ class SignalService:
             db.rollback()
             raise
         finally:
-            db.close() 
+            db.close()
+
+    def generate_signals(self, start_date: datetime, end_date: datetime, signal_type: Optional[str] = None, page: int = 1, page_size: int = 10, klines: List[KLineData] = None) -> tuple[List[Signal], int]:
+        """根据均线策略生成交易信号"""
+        try:
+            if not klines:
+                return [], 0
+                
+            # 将K线数据转换为列表
+            dates = []
+            prices = []
+            lows = []
+            ema5s = []
+            ema20s = []
+            symbols = []
+            for k in klines:
+                dates.append(k.date)
+                symbols.append(k.symbol)
+                prices.append(k.close)
+                lows.append(k.low)
+                ema5s.append(k.ema5)
+                ema20s.append(k.ema20)
+
+            # 生成信号
+            signals = []
+            for i in range(len(prices)-1):
+                if i < 20:  # 确保有足够的数据计算均线
+                    continue
+                    
+                # 检查金叉条件
+                if (ema5s[i] > ema20s[i] and  # 短期均线在长期均线上方
+                    ema5s[i-1] <= ema20s[i-1] and  # 前一日短期均线在长期均线下方
+                    ema20s[i] >= ema20s[i-1]):  # 长期均线平或上升
+                    
+                    # 计算前低作为止损点
+                    stop_loss = min(lows[i-5:i])
+                    
+                    # 生成买入开仓信号
+                    current_time = datetime.now()
+                    signal = Signal(
+                        id=str(uuid.uuid4()),
+                        date=dates[i],
+                        symbol=symbols[i],
+                        type=SignalType.BUY_OPEN,
+                        price=prices[i],
+                        quantity=1,
+                        status=SignalStatus.OPEN,
+                        reason=f"金叉信号：短期均线上穿长期均线，止损价：{stop_loss:.2f}",
+                        close_date=None,
+                        close_price=None,
+                        profit=0.0,
+                        created_at=current_time,
+                        updated_at=current_time
+                    )
+                    signals.append(signal)
+                
+                # 检查平仓条件：价格跌破长期均线
+                elif i > 0 and prices[i] < ema20s[i] and prices[i-1] >= ema20s[i-1]:
+                    # 生成卖出平仓信号
+                    current_time = datetime.now()
+                    signal = Signal(
+                        id=str(uuid.uuid4()),
+                        date=dates[i],
+                        symbol=symbols[i],
+                        type=SignalType.SELL_CLOSE,
+                        price=prices[i],
+                        quantity=1,
+                        status=SignalStatus.OPEN,
+                        reason=f"平仓信号：价格跌破长期均线",
+                        close_date=None,
+                        close_price=None,
+                        profit=0.0,
+                        created_at=current_time,
+                        updated_at=current_time
+                    )
+                    signals.append(signal)
+
+            # 返回最近的5个信号
+            total = len(signals)
+            # 按日期排序，确保返回最新的信号
+            signals.sort(key=lambda x: x.date, reverse=True)
+            # 只返回最近的5个信号
+            return signals[:5], total
+
+        except Exception as e:
+            self.logger.error(f"生成信号失败: {str(e)}")
+            return [], 0 
