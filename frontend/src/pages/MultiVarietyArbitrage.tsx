@@ -1,6 +1,4 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Tabs, Card, Typography, Statistic, Row, Col, Alert, Spin, Switch } from 'antd';
-import { ArrowUpOutlined, ArrowDownOutlined } from '@ant-design/icons';
 import ReactECharts from 'echarts-for-react';
 import dayjs from 'dayjs';
 import Layout from '../components/layout/Layout';
@@ -8,12 +6,10 @@ import Toast from '../components/Toast';
 import axios from 'axios';
 import { API_BASE_URL } from '../config/api';
 
-const { Title, Paragraph, Text } = Typography;
-const { TabPane } = Tabs;
-
 const MultiVarietyArbitrage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [isRealtime, setIsRealtime] = useState(false);
+  const [activeTab, setActiveTab] = useState('1');
   const [oilMealRatio, setOilMealRatio] = useState<number>(2.29);
   const [crushingMargin, setCrushingMargin] = useState<number>(240);
   const [historicalAverage, setHistoricalAverage] = useState<number>(150);
@@ -234,204 +230,221 @@ const MultiVarietyArbitrage: React.FC = () => {
           </p>
         </div>
 
-        <Row gutter={[24, 24]} className="mb-6">
-          <Col span={8}>
-            <Card>
-              <Statistic
-                title="当前油粕比"
-                value={oilMealRatio}
-                precision={3}
-                valueStyle={{ color: oilMealRatio > 2.5 ? '#cf1322' : oilMealRatio < 2.0 ? '#3f8600' : '#000000' }}
-                prefix={oilMealRatio > 2.5 ? <ArrowUpOutlined /> : oilMealRatio < 2.0 ? <ArrowDownOutlined /> : null}
-              />
-            </Card>
-          </Col>
-          <Col span={8}>
-            <Card>
-              <Statistic
-                title="当前压榨利润"
-                value={crushingMargin}
-                precision={0}
-                prefix="¥"
-                suffix="/吨"
-                valueStyle={{ color: crushingMargin > historicalAverage + 50 ? '#cf1322' : crushingMargin < historicalAverage - 50 ? '#3f8600' : '#000000' }}
-              />
-            </Card>
-          </Col>
-          <Col span={8}>
-            <Card>
-              <Statistic
-                title="历史均值"
-                value={historicalAverage}
-                precision={3}
-                prefix="¥"
-                suffix="/吨"
-              />
-            </Card>
-          </Col>
-        </Row>
-        
-        <Alert
-          message="策略说明及风险提示"
-          description={
-            <div>
-              <p>豆二、豆油、豆粕三者之间存在压榨关系：100%大豆≈18%豆油+80%豆粕+1.5%损耗。这一比例关系决定了三者价格存在长期均衡性，但日内可能因供需错配出现短期偏离。</p>
-              <ul className="list-disc pl-6 mt-2">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+          <div className="bg-white rounded-lg shadow p-6">
+            <div className="text-sm text-gray-500">当前油粕比</div>
+            <div className={`text-2xl font-semibold ${
+              oilMealRatio > 2.5 ? 'text-red-600' : 
+              oilMealRatio < 2.0 ? 'text-green-600' : 
+              'text-black'
+            }`}>
+              {oilMealRatio.toFixed(3)}
+            </div>
+          </div>
+          <div className="bg-white rounded-lg shadow p-6">
+            <div className="text-sm text-gray-500">当前压榨利润</div>
+            <div className={`text-2xl font-semibold ${
+              crushingMargin > historicalAverage + 50 ? 'text-red-600' : 
+              crushingMargin < historicalAverage - 50 ? 'text-green-600' : 
+              'text-black'
+            }`}>
+              ¥{crushingMargin.toFixed(0)}/吨
+            </div>
+          </div>
+          <div className="bg-white rounded-lg shadow p-6">
+            <div className="text-sm text-gray-500">历史均值</div>
+            <div className="text-2xl font-semibold">
+              ¥{historicalAverage.toFixed(3)}/吨
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-6">
+          <div className="flex">
+            <div className="flex-shrink-0">
+              <svg className="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+              </svg>
+            </div>
+            <div className="ml-3">
+              <p className="text-sm text-yellow-700">
+                豆二、豆油、豆粕三者之间存在压榨关系：100%大豆≈18%豆油+80%豆粕+1.5%损耗。这一比例关系决定了三者价格存在长期均衡性，但日内可能因供需错配出现短期偏离。
+              </p>
+              <ul className="list-disc pl-6 mt-2 text-sm text-yellow-700">
                 <li>油粕比套利：豆油与豆粕价格比值（油粕比）通常波动于1.8-2.8区间，日内可捕捉比值回归的波动。</li>
                 <li>压榨利润套利：当压榨利润（豆油+豆粕价格-大豆成本）偏离正常水平时，可通过多空组合对冲套利。</li>
               </ul>
-              <br/>
-              <p><b style={{color: 'red'}}>本策略仅供参考，测试结果基于三个品种的2509合约5分钟行情数据，实际交易中请注意风险控制，建议使用模拟盘进行测试。</b></p>
-            </div>
-          }
-          type="warning"
-          showIcon
-          className="mb-6"
-        />
-
-        <Card className="mb-6">
-          <div className="flex items-center justify-between">
-            <Text strong>数据来源: 新浪财经期货行情</Text>
-            <div className="flex items-center gap-2">
-              <Text>实时数据</Text>
-              <Switch 
-                checked={isRealtime} 
-                onChange={(checked) => {
-                  setIsRealtime(checked);
-                  if (checked) {
-                    fetchData(); // 立即获取一次数据
-                  }
-                }}
-                checkedChildren="开启" 
-                unCheckedChildren="关闭"
-              />
+              <p className="mt-4 text-sm font-bold text-red-600">
+                本策略仅供参考，测试结果基于三个品种的2509合约5分钟行情数据，实际交易中请注意风险控制，建议使用模拟盘进行测试。
+              </p>
             </div>
           </div>
-        </Card>
+        </div>
 
-        <Spin spinning={loading}>
-          <Tabs defaultActiveKey="1" type="card" className="bg-white rounded-lg shadow">
-            <TabPane tab="策略1：油粕比日内波段套利" key="1">
+        <div className="bg-white rounded-lg shadow p-6 mb-6">
+          <div className="flex items-center justify-between">
+            <span className="font-semibold">数据来源: 新浪财经期货行情</span>
+            <div className="flex items-center gap-2">
+              <span>实时数据</span>
+              <button
+                onClick={() => {
+                  setIsRealtime(!isRealtime);
+                  if (!isRealtime) {
+                    fetchData();
+                  }
+                }}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${
+                  isRealtime ? 'bg-blue-600' : 'bg-gray-200'
+                }`}
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                    isRealtime ? 'translate-x-6' : 'translate-x-1'
+                  }`}
+                />
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div className={`relative ${loading ? 'opacity-50' : ''}`}>
+          <div className="bg-white rounded-lg shadow">
+            <div className="border-b border-gray-200">
+              <nav className="-mb-px flex">
+                <button
+                  onClick={() => setActiveTab('1')}
+                  className={`w-1/2 py-4 px-1 text-center border-b-2 font-medium text-sm ${
+                    activeTab === '1'
+                      ? 'border-blue-500 text-blue-600'
+                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  }`}
+                >
+                  策略1：油粕比日内波段套利
+                </button>
+                <button
+                  onClick={() => setActiveTab('2')}
+                  className={`w-1/2 py-4 px-1 text-center border-b-2 font-medium text-sm ${
+                    activeTab === '2'
+                      ? 'border-blue-500 text-blue-600'
+                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  }`}
+                >
+                  策略2：压榨利润均值回归套利
+                </button>
+              </nav>
+            </div>
+
+            {activeTab === '1' && (
               <div className="p-6">
-                <Row gutter={[24, 24]} className="mb-6">
-                  <Col span={8}>
-                    <Card>
-                      <Statistic
-                        title="当前油粕比"
-                        value={oilMealRatio}
-                        precision={3}
-                        valueStyle={{ color: oilMealRatio > 2.5 ? '#cf1322' : oilMealRatio < 2.0 ? '#3f8600' : '#000000' }}
-                        prefix={oilMealRatio > 2.5 ? <ArrowUpOutlined /> : oilMealRatio < 2.0 ? <ArrowDownOutlined /> : null}
-                      />
-                    </Card>
-                  </Col>
-                  <Col span={8}>
-                    <Card>
-                      <Statistic
-                        title="建议操作"
-                        value={oilMealRatio > 2.5 ? '做空油粕比' : oilMealRatio < 2.0 ? '做多油粕比' : '观望'}
-                        valueStyle={{ color: oilMealRatio > 2.5 || oilMealRatio < 2.0 ? '#1890ff' : '#000000' }}
-                      />
-                    </Card>
-                  </Col>
-                  <Col span={8}>
-                    <Card>
-                      <Statistic
-                        title="目标盈利"
-                        value={200}
-                        prefix="¥"
-                        suffix="/组"
-                      />
-                    </Card>
-                  </Col>
-                </Row>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                  <div className="bg-white rounded-lg shadow p-6">
+                    <div className="text-sm text-gray-500">当前油粕比</div>
+                    <div className={`text-2xl font-semibold ${
+                      oilMealRatio > 2.5 ? 'text-red-600' : 
+                      oilMealRatio < 2.0 ? 'text-green-600' : 
+                      'text-black'
+                    }`}>
+                      {oilMealRatio.toFixed(3)}
+                    </div>
+                  </div>
+                  <div className="bg-white rounded-lg shadow p-6">
+                    <div className="text-sm text-gray-500">建议操作</div>
+                    <div className={`text-2xl font-semibold ${
+                      oilMealRatio > 2.5 || oilMealRatio < 2.0 ? 'text-blue-600' : 'text-black'
+                    }`}>
+                      {oilMealRatio > 2.5 ? '做空油粕比' : oilMealRatio < 2.0 ? '做多油粕比' : '观望'}
+                    </div>
+                  </div>
+                  <div className="bg-white rounded-lg shadow p-6">
+                    <div className="text-sm text-gray-500">目标盈利</div>
+                    <div className="text-2xl font-semibold">¥200/组</div>
+                  </div>
+                </div>
 
-                <Card className="mb-6">
+                <div className="bg-white rounded-lg shadow p-6 mb-6">
                   <ReactECharts option={oilMealRatioOption} style={{ height: '400px' }} />
-                </Card>
+                </div>
 
-                <Card>
-                  <Title level={4}>策略说明</Title>
-                  <Paragraph>
-                    <Text strong>触发条件：</Text>
+                <div className="bg-white rounded-lg shadow p-6">
+                  <h4 className="text-lg font-semibold mb-4">策略说明</h4>
+                  <div className="mb-4">
+                    <span className="font-semibold">触发条件：</span>
                     <ul className="list-disc pl-6 mt-2">
                       <li>当实时油粕比高于2.8或低于2.5时，视为短期超买/超卖信号</li>
                       <li>结合成交量放大（较前5分钟均值增长30%以上）确认趋势有效性</li>
                     </ul>
-                  </Paragraph>
-                  <Paragraph>
-                    <Text strong>操作方向：</Text>
+                  </div>
+                  <div>
+                    <span className="font-semibold">操作方向：</span>
                     <ul className="list-disc pl-6 mt-2">
                       <li>比值高位（{'>'}2.8）：做空油粕比（卖出豆油、买入豆粕）</li>
                       <li>比值低位（{'<'}2.5）：做多油粕比（买入豆油、卖出豆粕）</li>
                     </ul>
-                  </Paragraph>
-                </Card>
+                  </div>
+                </div>
               </div>
-            </TabPane>
+            )}
 
-            <TabPane tab="策略2：压榨利润均值回归套利" key="2">
+            {activeTab === '2' && (
               <div className="p-6">
-                <Row gutter={[24, 24]} className="mb-6">
-                  <Col span={8}>
-                    <Card>
-                      <Statistic
-                        title="当前压榨利润"
-                        value={crushingMargin}
-                        precision={0}
-                        prefix="¥"
-                        suffix="/吨"
-                        valueStyle={{ color: crushingMargin > historicalAverage + 50 ? '#cf1322' : crushingMargin < historicalAverage - 50 ? '#3f8600' : '#000000' }}
-                      />
-                    </Card>
-                  </Col>
-                  <Col span={8}>
-                    <Card>
-                      <Statistic
-                        title="历史均值"
-                        value={historicalAverage}
-                        precision={2}
-                        prefix="¥"
-                        suffix="/吨"
-                      />
-                    </Card>
-                  </Col>
-                  <Col span={8}>
-                    <Card>
-                      <Statistic
-                        title="建议操作"
-                        value={crushingMargin > historicalAverage + 50 ? '做空压榨利润' : crushingMargin < historicalAverage - 50 ? '做多压榨利润' : '观望'}
-                        valueStyle={{ color: Math.abs(crushingMargin - historicalAverage) > 50 ? '#1890ff' : '#000000' }}
-                      />
-                    </Card>
-                  </Col>
-                </Row>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                  <div className="bg-white rounded-lg shadow p-6">
+                    <div className="text-sm text-gray-500">当前压榨利润</div>
+                    <div className={`text-2xl font-semibold ${
+                      crushingMargin > historicalAverage + 50 ? 'text-red-600' : 
+                      crushingMargin < historicalAverage - 50 ? 'text-green-600' : 
+                      'text-black'
+                    }`}>
+                      ¥{crushingMargin.toFixed(0)}/吨
+                    </div>
+                  </div>
+                  <div className="bg-white rounded-lg shadow p-6">
+                    <div className="text-sm text-gray-500">历史均值</div>
+                    <div className="text-2xl font-semibold">
+                      ¥{historicalAverage.toFixed(2)}/吨
+                    </div>
+                  </div>
+                  <div className="bg-white rounded-lg shadow p-6">
+                    <div className="text-sm text-gray-500">建议操作</div>
+                    <div className={`text-2xl font-semibold ${
+                      Math.abs(crushingMargin - historicalAverage) > 50 ? 'text-blue-600' : 'text-black'
+                    }`}>
+                      {crushingMargin > historicalAverage + 50 ? '做空压榨利润' : 
+                       crushingMargin < historicalAverage - 50 ? '做多压榨利润' : '观望'}
+                    </div>
+                  </div>
+                </div>
 
-                <Card className="mb-6">
+                <div className="bg-white rounded-lg shadow p-6 mb-6">
                   <ReactECharts option={crushingMarginOption} style={{ height: '400px' }} />
-                </Card>
+                </div>
 
-                <Card>
-                  <Title level={4}>策略说明</Title>
-                  <Paragraph>
-                    <Text strong>触发条件：</Text>
+                <div className="bg-white rounded-lg shadow p-6">
+                  <h4 className="text-lg font-semibold mb-4">策略说明</h4>
+                  <div className="mb-4">
+                    <span className="font-semibold">触发条件：</span>
                     <ul className="list-disc pl-6 mt-2">
                       <li>实时压榨利润 = （豆油价格×0.18 + 豆粕价格×0.8）- 豆二价格</li>
                       <li>当利润较前5日均值偏离50元/吨以上时，视为套利机会</li>
                     </ul>
-                  </Paragraph>
-                  <Paragraph>
-                    <Text strong>操作方向：</Text>
+                  </div>
+                  <div>
+                    <span className="font-semibold">操作方向：</span>
                     <ul className="list-disc pl-6 mt-2">
                       <li>利润过高：做空压榨利润（卖出豆油+豆粕，买入豆二）</li>
                       <li>利润过低：做多压榨利润（买入豆油+豆粕，卖出豆二）</li>
                     </ul>
-                  </Paragraph>
-                </Card>
+                  </div>
+                </div>
               </div>
-            </TabPane>
-          </Tabs>
-        </Spin>
+            )}
+          </div>
+          {loading && (
+            <div className="absolute inset-0 bg-white bg-opacity-50 flex items-center justify-center">
+              <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-500"></div>
+            </div>
+          )}
+        </div>
       </div>
       {toast && (
         <Toast

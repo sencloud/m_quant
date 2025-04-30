@@ -149,8 +149,8 @@ const Header: React.FC = () => {
             <Link to="/" className="flex items-center">
               <img src="/logo.png" alt="Logo" className="h-12 w-auto mr-3" />
               <div className="flex flex-col">
-                <span className="text-2xl font-bold text-gray-900">豆粕组合策略</span>
-                <span className="text-sm text-gray-500">豆粕ETF、期货、期权及相关股票</span>
+                <span className="text-2xl font-bold text-gray-900">新致量化策略</span>
+                <span className="text-sm text-gray-500">豆粕期货、ETF、期权及相关股票</span>
               </div>
             </Link>
           </div>

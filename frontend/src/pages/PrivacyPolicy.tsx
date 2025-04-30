@@ -11,7 +11,7 @@ const PrivacyPolicy: React.FC = () => {
           <section>
             <h2 className="text-xl font-semibold mb-3">1. 信息收集</h2>
             <p className="text-gray-700">
-              豆粕组合策略分析平台（以下简称"本平台"）尊重并保护用户隐私。我们可能收集以下信息：
+              新致量化策略分析平台（以下简称"本平台"）尊重并保护用户隐私。我们可能收集以下信息：
             </p>
             <ul className="list-disc pl-6 mt-2 text-gray-700">
               <li>您提供的账户信息（如用户名、邮箱等）</li>

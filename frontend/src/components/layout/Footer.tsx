@@ -15,7 +15,7 @@ const Footer: React.FC = () => {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           {/* Company Info */}
           <div>
-            <h3 className="text-lg font-semibold mb-4">豆粕组合策略</h3>
+            <h3 className="text-lg font-semibold mb-4">新致量化策略</h3>
             <p className="text-gray-400 text-sm">
               本站是豆粕品种量化交易策略平台，为您提供全方位的市场数据分析和交易策略服务。
             </p>

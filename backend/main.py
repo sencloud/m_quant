@@ -156,4 +156,4 @@ async def shutdown_event():
 @app.get("/")
 async def root():
     logger.debug("收到根路径请求")
-    return {"message": "Welcome to 豆粕组合策略 API"} 
+    return {"message": "Welcome to 新致量化策略 API"} 

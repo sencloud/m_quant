@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     OPENAI_BASE_URL: str
     
     # 应用配置
-    PROJECT_NAME: str = "豆粕组合策略"
+    PROJECT_NAME: str = "新致量化策略"
     API_V1_STR: str = "/api/v1"
     
     # 数据库配置
