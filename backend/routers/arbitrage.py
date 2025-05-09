@@ -63,6 +63,78 @@ async def get_spread_data(
     
     return spread_data
 
+@router.get("/inter_species_spread")
+async def get_inter_species_spread_data(
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    contract1: str = "M2505.DCE",
+    contract2: str = "RM2509.ZCE"
+) -> List[dict]:
+    """
+    获取跨品种合约价差数据
+    """
+    market_service = MarketDataService()
+    
+    logger.info(f"获取跨品种价差数据: contract1={contract1}, contract2={contract2}")
+    
+    # 如果没有指定日期，默认获取最近30天的数据
+    if not end_date:
+        end_date = datetime.now().strftime('%Y%m%d')
+    if not start_date:
+        start_date = (datetime.now() - timedelta(days=30)).strftime('%Y%m%d')
+    
+    logger.info(f"查询时间范围: {start_date} 至 {end_date}")
+    
+    # 获取两个合约的数据
+    logger.info(f"正在获取合约 {contract1} 的数据...")
+    data1 = market_service._get_futures_data(start_date, end_date, contract1)
+    logger.info(f"获取到 {contract1} 数据条数: {len(data1) if data1 else 0}")
+    
+    logger.info(f"正在获取合约 {contract2} 的数据...")
+    data2 = market_service._get_futures_data(start_date, end_date, contract2)
+    logger.info(f"获取到 {contract2} 数据条数: {len(data2) if data2 else 0}")
+    
+    if not data1 or not data2:
+        logger.warning(f"至少一个合约没有数据: contract1={bool(data1)}, contract2={bool(data2)}")
+        return []
+    
+    # 将数据转换为DataFrame以便处理
+    logger.info("正在将数据转换为DataFrame...")
+    df = pd.DataFrame([{
+        'trade_date': data.trade_date,
+        'ts_code': data.ts_code,
+        'close': data.close
+    } for data in data1 + data2])
+    
+    if df.empty:
+        logger.warning("转换后的DataFrame为空")
+        return []
+    
+    logger.info(f"DataFrame包含 {len(df)} 行数据")
+    
+    # 计算价差
+    logger.info("开始计算价差...")
+    spread_data = []
+    unique_dates = df['trade_date'].unique()
+    logger.info(f"找到 {len(unique_dates)} 个唯一交易日")
+    
+    for date in unique_dates:
+        date_data = df[df['trade_date'] == date]
+        if len(date_data) == 2:  # 确保两个合约都有数据
+            price1 = date_data[date_data['ts_code'] == contract1]['close'].iloc[0]
+            price2 = date_data[date_data['ts_code'] == contract2]['close'].iloc[0]
+            spread = price1 - price2
+            spread_data.append({
+                'date': date,
+                'spread': spread
+            })
+            logger.debug(f"日期 {date}: {contract1}={price1}, {contract2}={price2}, 价差={spread}")
+        else:
+            logger.warning(f"日期 {date} 数据不完整, 跳过计算")
+    
+    logger.info(f"计算完成, 共生成 {len(spread_data)} 条价差数据")
+    return spread_data
+
 def load_kline_data(symbol: str) -> pd.DataFrame:
     """加载K线数据"""
     try:

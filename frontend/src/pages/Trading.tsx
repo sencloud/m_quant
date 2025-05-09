@@ -7,6 +7,7 @@ import TrendFollowStrategy from '../components/trading/TrendFollowStrategy';
 import OBVADXEMAStrategy from '../components/trading/OBVADXEMAStrategy';
 import GridStrategy from '../components/trading/GridStrategy';
 import SupportResistanceStrategy from '../components/trading/SupportResistanceStrategy';
+import InterSpeciesArbitrageStrategy from '../components/trading/InterSpeciesArbitrageStrategy';
 import { ChartBarIcon, ChartPieIcon, ArrowsRightLeftIcon, ChevronDownIcon, Squares2X2Icon } from '@heroicons/react/24/outline';
 
 interface StrategyCardProps {
@@ -99,6 +100,18 @@ const Trading: React.FC = () => {
           icon={<ArrowsRightLeftIcon />}
         >
           <ArbitrageStrategy />
+        </StrategyCard>
+
+        <StrategyCard
+          title="豆粕-菜粕跨品种套利策略"
+          tags={[
+            { text: "跨品种套利", color: "text-purple-800 bg-purple-100" },
+            { text: "价差交易", color: "text-orange-800 bg-orange-100" },
+            { text: "已回测", color: "text-green-800 bg-green-100" }
+          ]}
+          icon={<ArrowsRightLeftIcon />}
+        >
+          <InterSpeciesArbitrageStrategy />
         </StrategyCard>
         
         {/* <StrategyCard

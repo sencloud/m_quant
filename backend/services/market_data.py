@@ -150,10 +150,11 @@ class MarketDataService:
                 logger.info(f"获取到主力合约: {symbol}, 日期: {latest_trade_date}")
             
             # 获取合约基本信息
+            exchange = 'DCE' if symbol.split('.')[1] == 'DCE' else 'CZCE'
             contract_info = self._call_tushare_api(
                 self.pro.fut_basic,
                 ts_code=symbol,
-                exchange='DCE'
+                exchange=exchange
             )
             if contract_info is None or contract_info.empty:
                 logger.warning(f"未找到合约信息: {symbol}")
