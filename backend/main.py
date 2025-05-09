@@ -6,7 +6,7 @@ import os
 # 添加项目根目录到Python路径
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-from routers import market_data, trading, fundamental, core_factor, arbitrage, trend_follow, dual_ma, obv_adx_ema, news, ai, signals, account, grid, support_resistance, soybean, stockfutures
+from routers import market_data, trading, fundamental, core_factor, arbitrage, trend_follow, dual_ma, obv_adx_ema, news, ai, signals, account, grid, support_resistance, soybean, stockfutures, holding_analysis
 from config import settings
 from utils.logger import logger
 
@@ -137,6 +137,13 @@ app.include_router(
     tags=["stockfutures"]
 )
 logger.info("期股联动分析路由注册完成")
+
+app.include_router(
+    holding_analysis.router,
+    prefix=f"{settings.API_V1_STR}/holding",
+    tags=["holding"]
+)
+logger.info("持仓变化分析路由注册完成")
 
 @app.on_event("startup")
 async def startup_event():

@@ -18,6 +18,7 @@ import MultiVarietyArbitrage from './pages/MultiVarietyArbitrage';
 import StockFutures from './pages/pro/StockFutures';
 import SoybeanImport from './pages/pro/SoybeanImport';
 import MarketView from './pages/MarketView';
+import HoldingAnalysis from './pages/HoldingAnalysis';
 
 const queryClient = new QueryClient();
 
@@ -43,6 +44,7 @@ const App: React.FC = () => {
           <Route path="/terms" element={<TermsOfService />} />
           <Route path="/disclaimer" element={<Disclaimer />} />
           <Route path="/market" element={<MarketView />} />
+          <Route path="/holding-analysis" element={<HoldingAnalysis />} />
           {/* 其他路由将在后续添加 */}
         </Routes>
       </Router>

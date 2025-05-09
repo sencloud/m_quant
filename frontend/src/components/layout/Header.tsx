@@ -28,6 +28,18 @@ const Header: React.FC = () => {
         </Link>
       ),
     },
+    {
+      key: 'holding-analysis',
+      label: (
+        <Link to="/holding-analysis" className="flex items-center py-2 px-4 hover:bg-gray-50">
+          <BarChartOutlined className="mr-3 text-yellow-500 text-xl" />
+          <div>
+            <div className="font-medium">持仓变化分析</div>
+            <div className="text-xs text-gray-500">主力持仓变化及其影响分析</div>
+          </div>
+        </Link>
+      ),
+    },
     // {
     //   key: 'stock-futures',
     //   label: (
